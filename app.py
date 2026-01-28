@@ -43,14 +43,15 @@ app.config['SECRET_KEY'] = get_secret_key()
 # -------------------------
 # SETUP & CONFIG (RENDER COMPATIBLE)
 # -------------------------
-if os.environ.get('RENDER'):
-    DOWNLOAD_FOLDER = os.path.join("/tmp", "downloads")
-    UPLOAD_FOLDER = os.path.join("/tmp", "uploads")
-    DB_PATH = os.path.join("/tmp", "users.db")
+if os.environ.get("RENDER"):
+    DB_PATH = "/data/users.db"
+    DOWNLOAD_FOLDER = "/data/downloads"
+    UPLOAD_FOLDER = "/data/uploads"
 else:
+    DB_PATH = os.path.join(BASE_DIR, "users.db")
     DOWNLOAD_FOLDER = os.path.join(BASE_DIR, "downloads")
     UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
-    DB_PATH = os.environ.get('DB_PATH', os.path.join(BASE_DIR, "users.db"))
+
 
 if os.path.exists(os.path.join(BASE_DIR, "ffmpeg.exe")):
     FFMPEG_PATH = os.path.join(BASE_DIR, "ffmpeg.exe") 
@@ -473,4 +474,5 @@ def cleanup_files():
 threading.Thread(target=cleanup_files, daemon=True).start()
 
 if __name__ == "__main__":
+
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
