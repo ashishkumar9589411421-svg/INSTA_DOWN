@@ -1,5 +1,6 @@
-Flask
+flask
 flask-cors
 yt-dlp
-Werkzeug
 PyJWT
+gunicorn
+werkzeug
