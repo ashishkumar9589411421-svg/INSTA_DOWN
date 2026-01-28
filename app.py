@@ -22,8 +22,10 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__, static_folder=BASE_DIR, static_url_path='')
 CORS(app)
 
-# --- 1. Environment & Directories (Render Compatible) ---
-if os.environ.get("RENDER"):
+# --- DIRECTORY FIX FOR RENDER FREE TIER ---
+# Only use /data if it exists (meaning a Disk is actually mounted).
+# Otherwise, default to the current directory (BASE_DIR).
+if os.environ.get("RENDER") and os.path.exists("/data"):
     DATA_DIR = "/data"
 else:
     DATA_DIR = BASE_DIR
