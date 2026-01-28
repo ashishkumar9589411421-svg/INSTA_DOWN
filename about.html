@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About - In.dl Downloader</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root { --bg-deep: #000000; --primary: #d62976; --glass: rgba(20, 20, 20, 0.9); --text: #ffffff; --text-dim: #888; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Roboto, sans-serif; }
+        body { 
+            background-color: var(--bg-deep); 
+            background-image: radial-gradient(circle at 50% 50%, #111 0%, #000 100%);
+            color: var(--text); 
+            min-height: 100vh; 
+            overflow-x: hidden; 
+        }
+        .void-stream { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; overflow: hidden; pointer-events: none; }
+        .stream-icon { position: absolute; color: rgba(255, 255, 255, 0.08); font-size: 2.5rem; animation: floatRise linear infinite; text-shadow: 0 0 10px rgba(255, 255, 255, 0.05); }
+        @keyframes floatRise {
+            0% { transform: translateY(110vh) scale(0.8) rotate(0deg); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-10vh) scale(1.5) rotate(360deg); opacity: 0; }
+        }
+        header { padding: 20px 0; border-bottom: 1px solid #222; background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 100; }
+        .nav { max-width: 1000px; margin: 0 auto; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 1.5rem; font-weight: 900; display: flex; align-items: center; gap: 10px; text-decoration: none; color: white; }
+        .logo i { color: var(--primary); }
+        .back-btn { padding: 8px 20px; border: 1px solid #333; border-radius: 50px; color: white; text-decoration: none; transition: 0.3s; font-size: 0.9rem; }
+        .back-btn:hover { border-color: var(--primary); background: rgba(214, 41, 118, 0.1); }
+        .container { max-width: 800px; margin: 60px auto; padding: 0 20px; }
+        h1 { font-size: 3rem; margin-bottom: 20px; background: linear-gradient(to right, white, #666); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        p { color: var(--text-dim); line-height: 1.8; margin-bottom: 20px; font-size: 1.1rem; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 30px; margin-top: 50px; }
+        .card { background: var(--glass); padding: 30px; border: 1px solid #222; border-radius: 20px; text-align: center; transition: 0.3s; }
+        .card:hover { transform: translateY(-10px); border-color: var(--primary); }
+        .icon { font-size: 2.5rem; color: var(--primary); margin-bottom: 20px; }
+        .card h3 { margin-bottom: 10px; }
+        footer { margin-top: 80px; padding: 40px; border-top: 1px solid #222; text-align: center; color: #444; }
+        @media (max-width: 768px) {
+            .nav { padding: 0 15px; }
+            .container { margin: 40px auto; }
+            h1 { font-size: 2.5rem; }
+            .grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="void-stream" id="voidStream"></div>
+    <header>
+        <div class="nav">
+            <a href="index.html" class="logo"><i class="fab fa-instagram"></i> In.dl</a>
+            <a href="index.html" class="back-btn"><i class="fas fa-arrow-left"></i> Home</a>
+        </div>
+    </header>
+    <div class="container">
+        <h1>Instantly Save <br>What Matters.</h1>
+        <p>In.dl was created to simplify the way you save content from Instagram. Whether it's a Reel, a Story, or a Post, we believe downloading it should be one click away.</p>
+        <div class="grid">
+            <div class="card">
+                <div class="icon"><i class="fas fa-bolt"></i></div>
+                <h3>Instant</h3>
+                <p>Designed for speed. Paste your link and get the file in seconds.</p>
+            </div>
+            <div class="card">
+                <div class="icon"><i class="fas fa-shield-alt"></i></div>
+                <h3>Secure</h3>
+                <p>We respect your privacy. No tracking, no logs, no ads.</p>
+            </div>
+            <div class="card">
+                <div class="icon"><i class="fas fa-code"></i></div>
+                <h3>Open</h3>
+                <p>Powered by reliable open-source technology.</p>
+            </div>
+        </div>
+    </div>
+    <footer>
+        &copy; 2026 In.dl Downloader. All rights reserved.
+    </footer>
+    <script>
+        window.onload = spawnParticles;
+        function spawnParticles() {
+            const container = document.getElementById('voidStream');
+            const icons = ['fa-camera', 'fa-video', 'fa-image', 'fa-heart', 'fa-comment'];
+            for(let i=0; i<20; i++) {
+                let el = document.createElement('i');
+                el.className = `fas ${icons[Math.floor(Math.random()*icons.length)]} stream-icon`;
+                el.style.left = Math.random() * 100 + '%';
+                el.style.animationDuration = (Math.random() * 5 + 10) + 's';
+                el.style.animationDelay = Math.random() * 5 + 's';
+                container.appendChild(el);
+            }
+        }
+    </script>
+</body>
+</html>

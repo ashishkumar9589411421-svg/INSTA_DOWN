@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - In.dl</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root { --bg-deep: #000000; --primary: #d62976; --glass: rgba(20, 20, 20, 0.9); --text: #ffffff; --text-dim: #888; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Roboto, sans-serif; }
+        body { 
+            background-color: var(--bg-deep); 
+            background-image: radial-gradient(circle at 50% 50%, #111 0%, #000 100%);
+            color: var(--text); 
+            min-height: 100vh; 
+        }
+        .void-stream { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; overflow: hidden; pointer-events: none; }
+        .stream-icon { position: absolute; color: rgba(255, 255, 255, 0.08); font-size: 2.5rem; animation: floatRise linear infinite; text-shadow: 0 0 10px rgba(255, 255, 255, 0.05); }
+        @keyframes floatRise {
+            0% { transform: translateY(110vh) scale(0.8) rotate(0deg); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-10vh) scale(1.5) rotate(360deg); opacity: 0; }
+        }
+        header { padding: 20px 0; border-bottom: 1px solid #222; background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 100; }
+        .nav { max-width: 1000px; margin: 0 auto; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 1.5rem; font-weight: 900; display: flex; align-items: center; gap: 10px; text-decoration: none; color: white; }
+        .logo i { color: var(--primary); }
+        .back-btn { padding: 8px 20px; border: 1px solid #333; border-radius: 50px; color: white; text-decoration: none; transition: 0.3s; }
+        .back-btn:hover { border-color: var(--primary); }
+        .container { max-width: 800px; margin: 60px auto; padding: 0 20px; }
+        h1 { font-size: 2.5rem; margin-bottom: 10px; }
+        .last-updated { color: #555; font-size: 0.9rem; margin-bottom: 40px; }
+        .section { margin-bottom: 40px; padding: 30px; background: var(--glass); border-radius: 20px; border: 1px solid #222; }
+        h2 { color: white; margin-bottom: 15px; font-size: 1.5rem; display: flex; align-items: center; gap: 10px; }
+        h2 i { color: var(--primary); font-size: 1.2rem; }
+        p, li { color: var(--text-dim); line-height: 1.7; margin-bottom: 10px; }
+        ul { padding-left: 20px; }
+        footer { padding: 40px; text-align: center; color: #444; border-top: 1px solid #222; }
+        @media (max-width: 768px) { .section { padding: 20px; } h1 { font-size: 2rem; } h2 { font-size: 1.2rem; } }
+    </style>
+</head>
+<body>
+    <div class="void-stream" id="voidStream"></div>
+    <header>
+        <div class="nav">
+            <a href="index.html" class="logo"><i class="fab fa-instagram"></i> In.dl</a>
+            <a href="index.html" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
+        </div>
+    </header>
+    <div class="container">
+        <h1>Privacy Policy</h1>
+        <p class="last-updated">Last Updated: January 2026</p>
+        <div class="section">
+            <h2><i class="fas fa-user-secret"></i> 1. Data Collection</h2>
+            <p>We believe in minimalism. In.dl collects only the bare minimum required:</p>
+            <ul>
+                <li><strong>IP Addresses:</strong> Used strictly for rate limiting (5 downloads/day for guests) and abuse prevention.</li>
+                <li><strong>User Accounts:</strong> If you register, we store your username and a hashed (encrypted) version of your password.</li>
+                <li><strong>Payment Proofs:</strong> Screenshots uploaded for plan upgrades are stored securely for verification.</li>
+            </ul>
+        </div>
+        <div class="section">
+            <h2><i class="fas fa-hdd"></i> 2. File Retention</h2>
+            <p>We do not store your files permanently.</p>
+            <ul>
+                <li>When you request a download, our server temporarily processes the Instagram media.</li>
+                <li><strong>Automatic Deletion:</strong> All downloaded files are automatically wiped from our servers within 1 hour.</li>
+                <li>We do not keep logs of <em>what</em> specific content you download.</li>
+            </ul>
+        </div>
+        <div class="section">
+            <h2><i class="fas fa-cookie-bite"></i> 3. Cookies</h2>
+            <p>We use a single authentication token (JWT) stored in your browser to keep you logged in. No third-party tracking pixels.</p>
+        </div>
+        <div class="section">
+            <h2><i class="fas fa-envelope"></i> 4. Contact</h2>
+            <p>If you have privacy concerns or wish to request data deletion, please contact the admin via the support email.</p>
+        </div>
+    </div>
+    <footer>
+        &copy; 2026 In.dl Downloader.
+    </footer>
+    <script>
+        window.onload = spawnParticles;
+        function spawnParticles() {
+            const container = document.getElementById('voidStream');
+            const icons = ['fa-user-secret', 'fa-lock', 'fa-file-shield', 'fa-key', 'fa-eye-slash'];
+            for(let i=0; i<20; i++) {
+                let el = document.createElement('i');
+                el.className = `fas ${icons[Math.floor(Math.random()*icons.length)]} stream-icon`;
+                el.style.left = Math.random() * 100 + '%';
+                el.style.animationDuration = (Math.random() * 5 + 10) + 's';
+                el.style.animationDelay = Math.random() * 5 + 's';
+                container.appendChild(el);
+            }
+        }
+    </script>
+</body>
+</html>

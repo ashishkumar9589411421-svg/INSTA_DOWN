@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - In.dl</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root { --bg-deep: #050505; --primary: #d62976; --glass: rgba(20, 20, 20, 0.9); --border: rgba(255, 255, 255, 0.1); --text: #ffffff; --danger: #ff0033; --success: #00ff88; --warn: #ffaa00; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        body { background-color: var(--bg-deep); background-image: radial-gradient(circle at 50% 50%, #111 0%, #000 100%); color: var(--text); min-height: 100vh; }
+        .void-stream { position: fixed; inset: 0; z-index: -1; pointer-events: none; }
+        
+        header { padding: 20px; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 1.5rem; font-weight: 900; color: white; display: flex; gap: 10px; }
+        
+        .container { max-width: 1200px; margin: 40px auto; padding: 0 20px; }
+        
+        .grid-layout { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 40px; }
+        
+        .card { background: var(--glass); padding: 25px; border-radius: 15px; border: 1px solid var(--border); }
+        .card h3 { margin-bottom: 20px; display: flex; align-items: center; gap: 10px; font-size: 1.2rem; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+        
+        .stat-val { font-size: 2.5rem; font-weight: bold; color: var(--primary); }
+        .stat-label { color: #888; }
+        
+        .inp-group { margin-bottom: 15px; }
+        .inp-group label { display: block; margin-bottom: 5px; color: #aaa; font-size: 0.9rem; }
+        .inp { width: 100%; background: #000; border: 1px solid #333; padding: 10px; color: white; border-radius: 8px; outline: none; }
+        .inp:focus { border-color: var(--primary); }
+        
+        .btn { padding: 8px 12px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; color: white; font-size: 0.9rem; }
+        .btn-primary { background: var(--primary); }
+        .btn-danger { background: var(--danger); }
+        .btn-success { background: var(--success); color: black; }
+        .btn-warn { background: var(--warn); color: black; }
+        .btn:hover { opacity: 0.9; transform: scale(1.05); }
+        
+        /* Switch Toggle */
+        .switch { position: relative; display: inline-block; width: 50px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #333; transition: .4s; border-radius: 24px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--primary); }
+        input:checked + .slider:before { transform: translateX(26px); }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #222; font-size: 0.9rem; }
+        th { color: #888; }
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; }
+        .bg-red { background: rgba(255,0,0,0.2); color: red; }
+        .bg-blue { background: rgba(0, 100, 255, 0.2); color: #4facfe; }
+
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-box { background: #111; padding: 30px; border-radius: 15px; border: 1px solid #333; max-width: 500px; width: 90%; position: relative; text-align: center; }
+        
+        .action-btn-group { display: flex; gap: 5px; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo"><i class="fab fa-instagram"></i> In.dl Admin</div>
+        <a href="index.html" style="color:#aaa; text-decoration:none">Back to App</a>
+    </header>
+
+    <div class="container">
+        
+        <div class="grid-layout">
+            <div class="card">
+                <h3><i class="fas fa-users"></i> Users</h3>
+                <div class="stat-val" id="totalUsers">0</div>
+                <div class="stat-label">Registered Accounts</div>
+            </div>
+            <div class="card">
+                <h3><i class="fas fa-coins"></i> Credits</h3>
+                <div class="stat-val" id="totalCredits">0</div>
+                <div class="stat-label">Total Circulating</div>
+            </div>
+             <div class="card">
+                <h3><i class="fas fa-cogs"></i> System Control</h3>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px">
+                    <span>Maintenance Mode</span>
+                    <label class="switch"><input type="checkbox" id="maintSwitch" onchange="saveSettings()"><span class="slider"></span></label>
+                </div>
+                <div class="inp-group">
+                    <label>Global Announcement (Marquee)</label>
+                    <div style="display:flex; gap:10px">
+                        <input type="text" id="annInp" class="inp" placeholder="e.g. Server restart at 10PM">
+                        <button class="btn btn-primary" onclick="saveSettings()">Set</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-bottom:20px">
+            <h3><i class="fas fa-shield-alt"></i> Security & IP Bans</h3>
+            <div style="display:flex; gap:10px; margin-bottom:20px">
+                <input type="text" id="banIpInp" class="inp" placeholder="Enter IP Address to Ban" style="max-width:300px">
+                <button class="btn btn-danger" onclick="banIp()">Ban IP</button>
+            </div>
+            <div style="max-height:200px; overflow-y:auto">
+                <table id="banTable">
+                    <thead><tr><th>IP Address</th><th>Reason</th><th>Time</th><th>Action</th></tr></thead>
+                    <tbody id="banBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="grid-layout" style="grid-template-columns: 1fr;">
+            
+            <div class="card">
+                <h3><i class="fas fa-money-bill"></i> Payment Requests <button class="btn btn-primary" style="font-size:0.8rem; margin-left:auto" id="btnReq" onclick="fetchRequests()">Refresh</button></h3>
+                <div style="overflow-x:auto">
+                    <table id="reqTable">
+                        <thead><tr><th>User</th><th>Plan</th><th>Proof</th><th>Actions</th></tr></thead>
+                        <tbody id="reqBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3><i class="fas fa-user-cog"></i> User Management <button class="btn btn-primary" style="font-size:0.8rem; margin-left:auto" id="btnUsr" onclick="fetchUsers()">Refresh</button></h3>
+                <div style="overflow-x:auto">
+                    <table id="userTable">
+                        <thead><tr><th>Username</th><th>Plan</th><th>Credits</th><th>Actions</th></tr></thead>
+                        <tbody id="userBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="proofModal" onclick="this.style.display='none'">
+        <div class="modal-box" onclick="event.stopPropagation()">
+            <img id="proofImg" src="" style="width:100%; border-radius:10px; min-height:200px; background:#222;">
+            <p id="proofLoading" style="display:none; color:#888">Loading Image...</p>
+        </div>
+    </div>
+
+    <script>
+        const API = "/api/admin";
+        const token = localStorage.getItem('token');
+        if(!token) location.href='index.html';
+
+        async function init() {
+            await Promise.all([fetchUsers(), fetchRequests(), fetchSettings(), fetchBans()]);
+        }
+
+        async function fetchSettings() {
+            try {
+                const res = await fetch(`${API}/settings`, { headers: {'Authorization': `Bearer ${token}`} });
+                const d = await res.json();
+                document.getElementById('maintSwitch').checked = d.maintenance;
+                document.getElementById('annInp').value = d.announcement;
+            } catch(e) { console.log("Settings fetch failed"); }
+        }
+
+        async function saveSettings() {
+            const maint = document.getElementById('maintSwitch').checked;
+            const ann = document.getElementById('annInp').value;
+            await fetch(`${API}/settings`, {
+                method: 'POST', headers: {'Content-Type':'application/json', 'Authorization': `Bearer ${token}`},
+                body: JSON.stringify({ maintenance: maint, announcement: ann })
+            });
+            alert("Settings Saved");
+        }
+
+        async function fetchBans() {
+            const res = await fetch(`${API}/ban`, { headers: {'Authorization': `Bearer ${token}`} });
+            const d = await res.json();
+            document.getElementById('banBody').innerHTML = d.map(b => `
+                <tr><td>${b.ip}</td><td>${b.reason}</td><td>${new Date(b.timestamp).toLocaleDateString()}</td>
+                <td><button class="btn btn-success" style="padding:2px 8px" onclick="unbanIp('${b.ip}')">Unban</button></td></tr>
+            `).join('');
+        }
+
+        async function banIp() {
+            const ip = document.getElementById('banIpInp').value;
+            if(!ip) return;
+            await fetch(`${API}/ban`, { method:'POST', headers: {'Content-Type':'application/json', 'Authorization': `Bearer ${token}`}, body: JSON.stringify({ip}) });
+            document.getElementById('banIpInp').value = '';
+            fetchBans();
+        }
+
+        async function unbanIp(ip) {
+            await fetch(`${API}/ban`, { method:'DELETE', headers: {'Content-Type':'application/json', 'Authorization': `Bearer ${token}`}, body: JSON.stringify({ip}) });
+            fetchBans();
+        }
+
+        async function fetchUsers() {
+            const btn = document.getElementById('btnUsr');
+            if(btn) btn.innerText = "...";
+            
+            const res = await fetch(`${API}/users`, { headers: {'Authorization': `Bearer ${token}`} });
+            const d = await res.json();
+            
+            document.getElementById('totalUsers').innerText = d.users.length;
+            document.getElementById('totalCredits').innerText = d.users.reduce((a,b)=>a+b.tokens,0);
+            
+            document.getElementById('userBody').innerHTML = d.users.map(u => `
+                <tr>
+                    <td>
+                        <div style="font-weight:bold">${u.username}</div>
+                        <span class="badge ${u.is_admin?'btn-primary':'bg-red'}">${u.is_admin?'Admin':'User'}</span>
+                        <div style="font-size:0.8rem; color:#666">${u.email || 'No Email'}</div>
+                    </td>
+                    <td>${u.plan}</td>
+                    <td>${u.tokens}</td>
+                    <td>
+                        <div class="action-btn-group">
+                            <button class="btn btn-success" onclick="addCredits(${u.id})" title="Add Credits"><i class="fas fa-plus"></i></button>
+                            <button class="btn btn-primary" onclick="toggleAdmin(${u.id}, ${u.is_admin})" title="Toggle Admin"><i class="fas fa-user-shield"></i></button>
+                            <button class="btn btn-warn" onclick="resetPass(${u.id})" title="Reset Password"><i class="fas fa-key"></i></button>
+                            <button class="btn btn-danger" onclick="delUser(${u.id})" title="Delete User"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+            
+            if(btn) btn.innerText = "Refresh";
+        }
+
+        async function addCredits(id) {
+            const amount = prompt("Enter amount of credits to add (e.g. 50, 100):", "50");
+            if(amount) {
+                await fetch(`${API}/credits`, { 
+                    method:'POST', 
+                    headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`}, 
+                    body:JSON.stringify({user_id:id, amount:amount})
+                });
+                fetchUsers();
+            }
+        }
+
+        async function toggleAdmin(id, currentStatus) {
+            const newStatus = !currentStatus;
+            if(confirm(`Make this user ${newStatus ? 'Admin' : 'Regular User'}?`)) {
+                await fetch(`${API}/promote`, { 
+                    method:'POST', 
+                    headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`}, 
+                    body:JSON.stringify({user_id:id, is_admin:newStatus})
+                });
+                fetchUsers();
+            }
+        }
+
+        async function resetPass(id) {
+            const newPass = prompt("Enter new password for this user:");
+            if(newPass) {
+                await fetch(`${API}/reset-password`, { 
+                    method:'POST', 
+                    headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`}, 
+                    body:JSON.stringify({user_id:id, password:newPass})
+                });
+                alert("Password Updated");
+            }
+        }
+
+        async function delUser(id) {
+            if(confirm("Are you sure you want to delete this user? This cannot be undone.")) {
+                await fetch(`${API}/user/${id}`, { method:'DELETE', headers:{'Authorization':`Bearer ${token}`} });
+                fetchUsers();
+            }
+        }
+
+        async function fetchRequests() {
+            const btn = document.getElementById('btnReq');
+            if(btn) btn.innerText = "...";
+            
+            const res = await fetch(`${API}/requests`, { headers: {'Authorization': `Bearer ${token}`} });
+            const d = await res.json();
+            document.getElementById('reqBody').innerHTML = d.requests.map(r => `
+                <tr>
+                    <td>${r.username}</td>
+                    <td><span class="badge bg-blue">${r.plan_name}</span></td>
+                    <td><button class="btn" style="border:1px solid #555" onclick="showProof('${r.screenshot_path}')">View</button></td>
+                    <td>
+                        <button class="btn btn-success" onclick="handleReq(${r.id}, 'approve')"><i class="fas fa-check"></i></button>
+                        <button class="btn btn-danger" onclick="handleReq(${r.id}, 'reject')"><i class="fas fa-times"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+            
+            if(btn) btn.innerText = "Refresh";
+        }
+
+        async function handleReq(id, action) {
+            await fetch(`${API}/approve`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`}, body:JSON.stringify({request_id:id, action})});
+            fetchRequests(); fetchUsers();
+        }
+
+        // FIX: SECURE IMAGE PREVIEW
+        async function showProof(path) {
+            document.getElementById('proofModal').style.display = 'flex';
+            document.getElementById('proofLoading').style.display = 'block';
+            document.getElementById('proofImg').style.display = 'none';
+            
+            try {
+                // Fetch image using the token header (same as API)
+                const res = await fetch(`/uploads/${path}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (res.ok) {
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const img = document.getElementById('proofImg');
+                    img.src = url;
+                    img.style.display = 'block';
+                } else {
+                    alert("Unable to load image (403 Access Denied)");
+                }
+            } catch (e) {
+                alert("Error loading image");
+            } finally {
+                document.getElementById('proofLoading').style.display = 'none';
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

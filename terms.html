@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terms of Service - In.dl</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root { --bg-deep: #000000; --primary: #d62976; --glass: rgba(20, 20, 20, 0.9); --text: #ffffff; --text-dim: #888; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Roboto, sans-serif; }
+        body { 
+            background-color: var(--bg-deep); 
+            background-image: radial-gradient(circle at 50% 50%, #111 0%, #000 100%);
+            color: var(--text); 
+            min-height: 100vh; 
+        }
+        .void-stream { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; overflow: hidden; pointer-events: none; }
+        .stream-icon { position: absolute; color: rgba(255, 255, 255, 0.08); font-size: 2.5rem; animation: floatRise linear infinite; text-shadow: 0 0 10px rgba(255, 255, 255, 0.05); }
+        @keyframes floatRise {
+            0% { transform: translateY(110vh) scale(0.8) rotate(0deg); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-10vh) scale(1.5) rotate(360deg); opacity: 0; }
+        }
+        header { padding: 20px 0; border-bottom: 1px solid #222; background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 100; }
+        .nav { max-width: 1000px; margin: 0 auto; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 1.5rem; font-weight: 900; display: flex; align-items: center; gap: 10px; text-decoration: none; color: white; }
+        .logo i { color: var(--primary); }
+        .back-btn { padding: 8px 20px; border: 1px solid #333; border-radius: 50px; color: white; text-decoration: none; transition: 0.3s; }
+        .back-btn:hover { border-color: var(--primary); }
+        .container { max-width: 800px; margin: 60px auto; padding: 0 20px; }
+        h1 { font-size: 2.5rem; margin-bottom: 40px; border-left: 5px solid var(--primary); padding-left: 20px; }
+        .term-box { margin-bottom: 30px; }
+        h3 { color: white; margin-bottom: 10px; font-size: 1.2rem; }
+        p { color: var(--text-dim); line-height: 1.6; margin-bottom: 15px; text-align: justify; }
+        .alert-box { background: rgba(214, 41, 118, 0.1); border: 1px solid var(--primary); padding: 20px; border-radius: 10px; margin: 30px 0; }
+        .alert-box strong { color: var(--primary); }
+        footer { padding: 40px; text-align: center; color: #444; border-top: 1px solid #222; }
+        @media (max-width: 768px) { h1 { font-size: 2rem; } }
+    </style>
+</head>
+<body>
+    <div class="void-stream" id="voidStream"></div>
+    <header>
+        <div class="nav">
+            <a href="index.html" class="logo"><i class="fab fa-instagram"></i> In.dl</a>
+            <a href="index.html" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
+        </div>
+    </header>
+    <div class="container">
+        <h1>Terms & Conditions</h1>
+        <div class="alert-box">
+            <strong><i class="fas fa-exclamation-triangle"></i> Important Disclaimer:</strong><br>
+            In.dl Downloader is a tool strictly for personal use. We do not host any copyrighted files. You agree to use this service in compliance with all applicable laws.
+        </div>
+        <div class="term-box">
+            <h3>1. Acceptance of Terms</h3>
+            <p>By using In.dl, you accept and agree to be bound by these terms. If you do not agree to abide by these terms, please do not use this service.</p>
+        </div>
+        <div class="term-box">
+            <h3>2. Fair Use Policy</h3>
+            <p>You may only download content for which you have the legal right to do so (e.g., your own content, public domain content, or content under "Fair Use"). You agree not to use this tool to infringe on copyrights.</p>
+        </div>
+        <div class="term-box">
+            <h3>3. Service Limitations</h3>
+            <p>We provide this service "as is". We do not guarantee availability or download speeds. Guest users are limited to 5 downloads per day.</p>
+        </div>
+        <div class="term-box">
+            <h3>4. User Accounts</h3>
+            <p>You are responsible for your account credentials. We reserve the right to ban or suspend any account found abusing the system.</p>
+        </div>
+        <div class="term-box">
+            <h3>5. Refunds</h3>
+            <p>Credits purchased via the "Booster" or "God Mode" plans are non-refundable once added to your account, due to the digital nature of the service.</p>
+        </div>
+    </div>
+    <footer>
+        &copy; 2026 In.dl Downloader.
+    </footer>
+    <script>
+        window.onload = spawnParticles;
+        function spawnParticles() {
+            const container = document.getElementById('voidStream');
+            const icons = ['fa-gavel', 'fa-scale-balanced', 'fa-file-contract', 'fa-handshake', 'fa-pen-nib'];
+            for(let i=0; i<20; i++) {
+                let el = document.createElement('i');
+                el.className = `fas ${icons[Math.floor(Math.random()*icons.length)]} stream-icon`;
+                el.style.left = Math.random() * 100 + '%';
+                el.style.animationDuration = (Math.random() * 5 + 10) + 's';
+                el.style.animationDelay = Math.random() * 5 + 's';
+                container.appendChild(el);
+            }
+        }
+    </script>
+</body>
+</html>
