@@ -27,7 +27,7 @@ CORS(app)
 if os.path.exists("/data"):
     STORAGE_DIR = "/data"
 elif os.environ.get("RENDER"):
-    STORAGE_DIR = "/tmp" # Ephemeral (Free Tier)
+    STORAGE_DIR = "/tmp" # Ephemeral (Free Tier fallback)
 else:
     STORAGE_DIR = BASE_DIR
 
