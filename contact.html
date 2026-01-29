@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contact - In.dl Downloader</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root { 
+            --bg-deep: #000000; 
+            --primary: #d62976; 
+            --glass: rgba(20, 20, 20, 0.9); 
+            --text: #ffffff; 
+            --text-dim: #888;
+            --border: rgba(255, 255, 255, 0.1);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Roboto, sans-serif; }
+        
+        body { 
+            background-color: var(--bg-deep); 
+            background-image: radial-gradient(circle at 50% 50%, #111 0%, #000 100%);
+            color: var(--text); 
+            min-height: 100vh; 
+            overflow-x: hidden; 
+        }
+
+        /* Particle Background */
+        .void-stream { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; overflow: hidden; pointer-events: none; }
+        .stream-icon { position: absolute; color: rgba(255, 255, 255, 0.08); font-size: 2.5rem; animation: floatRise linear infinite; }
+        @keyframes floatRise {
+            0% { transform: translateY(110vh) scale(0.8) rotate(0deg); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-10vh) scale(1.5) rotate(360deg); opacity: 0; }
+        }
+
+        /* Navbar */
+        header { padding: 20px 0; border-bottom: 1px solid #222; background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 100; }
+        .nav { max-width: 1000px; margin: 0 auto; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 1.5rem; font-weight: 900; display: flex; align-items: center; gap: 10px; text-decoration: none; color: white; }
+        .logo i { color: var(--primary); }
+        .back-btn { padding: 8px 20px; border: 1px solid #333; border-radius: 50px; color: white; text-decoration: none; transition: 0.3s; font-size: 0.9rem; }
+        .back-btn:hover { border-color: var(--primary); background: rgba(214, 41, 118, 0.1); }
+
+        /* Main Container */
+        .container { max-width: 900px; margin: 60px auto; padding: 0 20px; display: flex; flex-direction: column; align-items: center; }
+        
+        .hero-text { text-align: center; margin-bottom: 50px; }
+        .hero-text h1 { font-size: 3rem; margin-bottom: 15px; background: linear-gradient(to right, white, #666); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .hero-text p { color: var(--text-dim); font-size: 1.1rem; max-width: 600px; margin: 0 auto; }
+
+        /* --- THE GLOWING ICONS (From Video) --- */
+        .social-container {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-bottom: 60px;
+            flex-wrap: wrap;
+        }
+
+        .glow-icon {
+            position: relative;
+            width: 70px;
+            height: 70px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-decoration: none;
+            transition: 0.4s;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+        }
+
+        .glow-icon i {
+            font-size: 28px;
+            color: #fff;
+            transition: 0.4s;
+            z-index: 2;
+        }
+
+        /* Hover Effects */
+        .glow-icon:hover {
+            background: var(--color); /* Uses the CSS variable defined inline */
+            box-shadow: 0 0 40px var(--color), 0 0 80px var(--color);
+            transform: translateY(-10px);
+            border-color: var(--color);
+        }
+
+        .glow-icon:hover i {
+            color: #fff;
+            transform: scale(1.2);
+        }
+
+        /* Specific Colors */
+        .glow-icon.insta { --color: #d62976; }
+        .glow-icon.git { --color: #6e5494; } /* GitHub Purple */
+        .glow-icon.port { --color: #ffd700; } /* Gold */
+
+        /* --- Contact Form --- */
+        .form-card {
+            background: var(--glass);
+            padding: 40px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            width: 100%;
+            max-width: 700px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+
+        .inp-group { margin-bottom: 20px; position: relative; }
+        .inp-group label { display: block; margin-bottom: 8px; color: #aaa; font-size: 0.9rem; font-weight: 600; }
+        
+        .inp-field {
+            width: 100%;
+            padding: 15px;
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 10px;
+            color: white;
+            font-size: 1rem;
+            outline: none;
+            transition: 0.3s;
+        }
+        
+        .inp-field:focus { border-color: var(--primary); box-shadow: 0 0 15px rgba(214, 41, 118, 0.2); }
+        textarea.inp-field { resize: vertical; min-height: 120px; }
+
+        .submit-btn {
+            width: 100%;
+            padding: 15px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+            box-shadow: 0 0 20px rgba(214, 41, 118, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .submit-btn:hover {
+            transform: scale(1.02);
+            box-shadow: 0 0 40px rgba(214, 41, 118, 0.6);
+        }
+
+        /* Success Message Animation */
+        #msgSent {
+            display: none;
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid #00ff88;
+            color: #00ff88;
+            border-radius: 10px;
+            text-align: center;
+            animation: popIn 0.4s ease;
+        }
+        @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+        footer { margin-top: 80px; padding: 40px; border-top: 1px solid #222; text-align: center; color: #444; }
+
+        @media (max-width: 600px) {
+            .hero-text h1 { font-size: 2.2rem; }
+            .social-container { gap: 20px; }
+            .glow-icon { width: 60px; height: 60px; }
+            .form-card { padding: 25px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="void-stream" id="voidStream"></div>
+
+    <header>
+        <div class="nav">
+            <a href="index.html" class="logo"><i class="fab fa-instagram"></i> In.dl</a>
+            <a href="index.html" class="back-btn"><i class="fas fa-arrow-left"></i> Home</a>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="hero-text">
+            <h1>Get in Touch</h1>
+            <p>Have a question, a bug report, or just want to say hi? I'm always open to discussing new projects and creative ideas.</p>
+        </div>
+
+        <div class="social-container">
+            <a href="#" class="glow-icon insta" target="_blank">
+                <i class="fab fa-instagram"></i>
+            </a>
+            <a href="#" class="glow-icon git" target="_blank">
+                <i class="fab fa-github"></i>
+            </a>
+            <a href="#" class="glow-icon port" target="_blank" title="Portfolio">
+                <i class="fas fa-briefcase"></i>
+            </a>
+        </div>
+
+        <div class="form-card">
+            <h3 style="margin-bottom: 25px; font-size: 1.5rem; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-envelope-open-text" style="color:var(--primary)"></i> Send a Message
+            </h3>
+            <form id="contactForm">
+                <div class="inp-group">
+                    <label>Your Name</label>
+                    <input type="text" class="inp-field" placeholder="John Doe" required>
+                </div>
+                <div class="inp-group">
+                    <label>Email Address</label>
+                    <input type="email" class="inp-field" placeholder="john@example.com" required>
+                </div>
+                <div class="inp-group">
+                    <label>Message</label>
+                    <textarea class="inp-field" placeholder="Tell me about your project or issue..." required></textarea>
+                </div>
+                <button type="submit" class="submit-btn">
+                    <span>Send Message</span> <i class="fas fa-paper-plane"></i>
+                </button>
+            </form>
+            <div id="msgSent">
+                <i class="fas fa-check-circle"></i> Message Sent Successfully! I'll get back to you soon.
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        &copy; 2026 In.dl Downloader. Designed by Ashish.
+    </footer>
+
+    <script>
+        // Particle Background Logic
+        window.onload = function() {
+            const container = document.getElementById('voidStream');
+            const icons = ['fa-paper-plane', 'fa-envelope', 'fa-at', 'fa-comment', 'fa-user'];
+            
+            for(let i=0; i<15; i++) {
+                let el = document.createElement('i');
+                el.className = `fas ${icons[Math.floor(Math.random()*icons.length)]} stream-icon`;
+                el.style.left = Math.random() * 100 + '%';
+                el.style.animationDuration = (Math.random() * 10 + 10) + 's';
+                el.style.animationDelay = Math.random() * 5 + 's';
+                el.style.fontSize = (Math.random() * 2 + 1) + 'rem';
+                container.appendChild(el);
+            }
+        };
+
+        // REAL Form Submission Logic
+        document.getElementById('contactForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const btn = document.querySelector('.submit-btn');
+            const originalText = btn.innerHTML;
+            const name = document.querySelector('input[type="text"]').value;
+            const email = document.querySelector('input[type="email"]').value;
+            const msgText = document.querySelector('textarea').value;
+
+            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Sending...';
+            btn.disabled = true;
+            btn.style.opacity = '0.8';
+            
+            try {
+                const res = await fetch('/api/contact', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name, email: email, message: msgText })
+                });
+
+                if(res.ok) {
+                    document.getElementById('contactForm').reset();
+                    const msg = document.getElementById('msgSent');
+                    msg.style.display = 'block';
+                    setTimeout(() => { msg.style.display = 'none'; }, 5000);
+                } else {
+                    alert("Failed to send message. Please try again.");
+                }
+            } catch(e) {
+                alert("Network error. Please try again later.");
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                btn.style.opacity = '1';
+            }
+        });
+    </script>
+</body>
+</html>
