@@ -78,11 +78,14 @@ def init_db():
     
     if db_type == "postgres":
         # Postgres Syntax
-        c.execute("""CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username TEXT UNIQUE, email TEXT, password TEXT, tokens INTEGER DEFAULT 15, last_reset TIMESTAMP, is_admin INTEGER DEFAULT 0, plan TEXT DEFAULT 'Free')""")
+        c.execute("""CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username TEXT UNIQUE, email TEXT, password TEXT, tokens INTEGER DEFAULT 15, last_reset TIMESTAMP, is_admin INTEGER DEFAULT 0, plan TEXT DEFAULT 'Free', referral_code TEXT UNIQUE, referred_by TEXT)""")
         c.execute("""CREATE TABLE IF NOT EXISTS guests (ip TEXT PRIMARY KEY, tokens INTEGER DEFAULT 5, last_reset TIMESTAMP)""")
         c.execute("""CREATE TABLE IF NOT EXISTS payment_requests (id SERIAL PRIMARY KEY, user_id INTEGER, username TEXT, plan_name TEXT, screenshot_path TEXT, status TEXT DEFAULT 'pending', timestamp TIMESTAMP)""")
         c.execute("""CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)""")
         c.execute("""CREATE TABLE IF NOT EXISTS banned_ips (ip TEXT PRIMARY KEY, reason TEXT, timestamp TIMESTAMP)""")
+        # Messages Table
+        c.execute("""CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, name TEXT, email TEXT, message TEXT, timestamp TIMESTAMP)""")
+        
         conn.commit()
         
         # Create Admin
@@ -96,9 +99,10 @@ def init_db():
 
     else:
         # SQLite Syntax (Fallback)
-        c.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, email TEXT, password TEXT, tokens INTEGER DEFAULT 15, last_reset DATETIME, is_admin INTEGER DEFAULT 0, plan TEXT DEFAULT 'Free')")
+        c.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, email TEXT, password TEXT, tokens INTEGER DEFAULT 15, last_reset DATETIME, is_admin INTEGER DEFAULT 0, plan TEXT DEFAULT 'Free', referral_code TEXT UNIQUE, referred_by TEXT)")
         c.execute("CREATE TABLE IF NOT EXISTS guests (ip TEXT PRIMARY KEY, tokens INTEGER DEFAULT 5, last_reset DATETIME)")
         c.execute("CREATE TABLE IF NOT EXISTS payment_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, username TEXT, plan_name TEXT, screenshot_path TEXT, status TEXT DEFAULT 'pending', timestamp DATETIME)")
+        c.execute("CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT, message TEXT, timestamp DATETIME)")
         # Admin
         c.execute("SELECT * FROM users WHERE username='ashishadmin'")
         if not c.fetchone():
@@ -210,11 +214,34 @@ def register():
     data = request.json
     conn, t = get_db_connection()
     c = conn.cursor()
+    
+    # Generate unique referral code
+    ref_code = (data["username"][:4] + secrets.token_hex(2)).upper()
+    used_ref = data.get("referral_code", "").strip().upper()
+    bonus = 0
+    
     try:
-        q = "INSERT INTO users(username, email, password, tokens, last_reset, is_admin, plan) VALUES (%s, %s, %s, 15, %s, 0, 'Free')" if t == "postgres" else "INSERT INTO users(username, email, password, tokens, last_reset, is_admin, plan) VALUES (?, ?, ?, 15, ?, 0, 'Free')"
-        c.execute(q, (data["username"].lower(), data.get("email",""), generate_password_hash(data["password"]), datetime.now()))
+        if used_ref:
+            q = "SELECT id FROM users WHERE referral_code=%s" if t == "postgres" else "SELECT id FROM users WHERE referral_code=?"
+            c.execute(q, (used_ref,))
+            referrer = c.fetchone()
+            if referrer:
+                u_q = "UPDATE users SET tokens = tokens + 10 WHERE id=%s" if t == "postgres" else "UPDATE users SET tokens = tokens + 10 WHERE id=?"
+                c.execute(u_q, (referrer[0] if t=="postgres" else referrer['id'],))
+                bonus = 10 
+
+        q = "INSERT INTO users(username, email, password, tokens, last_reset, is_admin, plan, referral_code, referred_by) VALUES (%s, %s, %s, %s, %s, 0, 'Free', %s, %s)" if t == "postgres" else "INSERT INTO users(username, email, password, tokens, last_reset, is_admin, plan, referral_code, referred_by) VALUES (?, ?, ?, ?, ?, 0, 'Free', ?, ?)"
+        c.execute(q, (
+            data["username"].lower(), 
+            data.get("email",""), 
+            generate_password_hash(data["password"]), 
+            15 + bonus,
+            datetime.now(),
+            ref_code,
+            used_ref if bonus > 0 else None
+        ))
         conn.commit()
-        return jsonify({"message": "User registered"}), 201
+        return jsonify({"message": f"Registered! {'You got +10 credits!' if bonus else ''}"}), 201
     except: return jsonify({"message": "Username taken"}), 409
     finally: conn.close()
 
@@ -290,6 +317,41 @@ def pay_req():
 def serve_up(filename):
     if not is_admin_request(request): return "Unauthorized", 403
     return send_from_directory(UPLOAD_FOLDER, filename)
+
+# -------------------------
+# CONTACT FORM ROUTES (NEW)
+# -------------------------
+@app.route("/api/contact", methods=["POST"])
+def contact_submit():
+    data = request.json
+    conn, t = get_db_connection()
+    c = conn.cursor()
+    q = "INSERT INTO messages (name, email, message, timestamp) VALUES (%s, %s, %s, %s)" if t == "postgres" else "INSERT INTO messages (name, email, message, timestamp) VALUES (?, ?, ?, ?)"
+    c.execute(q, (data.get("name"), data.get("email"), data.get("message"), datetime.now()))
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Message sent"})
+
+@app.route("/api/admin/messages", methods=["GET"])
+def get_messages():
+    if not is_admin_request(request): return jsonify({"error": "Unauthorized"}), 403
+    conn, t = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM messages ORDER BY timestamp DESC")
+    rows = c.fetchall()
+    conn.close()
+    return jsonify([dict(row) for row in rows])
+
+@app.route("/api/admin/message/<int:msg_id>", methods=["DELETE"])
+def delete_message(msg_id):
+    if not is_admin_request(request): return jsonify({"error": "Unauthorized"}), 403
+    conn, t = get_db_connection()
+    c = conn.cursor()
+    q = "DELETE FROM messages WHERE id=%s" if t == "postgres" else "DELETE FROM messages WHERE id=?"
+    c.execute(q, (msg_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Deleted"})
 
 # -------------------------
 # ADMIN API (POSTGRES COMPATIBLE)
