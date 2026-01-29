@@ -7,7 +7,8 @@ import uuid
 import time
 import threading
 import re
-import sqlite3
+import psycopg2
+from psycopg2.extras import RealDictCursor
 import jwt 
 import secrets
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -16,62 +17,37 @@ from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
 
 # -------------------------
-# CONFIGURATION & SETUP
+# CONFIGURATION
 # -------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__, static_folder=BASE_DIR, static_url_path='')
 CORS(app)
 
-# Persistent Secret Key (Crucial for Render)
+# Secrets & Cookies
 SECRET_FILE = os.path.join(BASE_DIR, "secret.key")
 COOKIE_FILE = os.path.join(BASE_DIR, "cookies.txt")
 
 def get_secret_key():
-    if os.environ.get('SECRET_KEY'):
-        return os.environ.get('SECRET_KEY')
+    if os.environ.get('SECRET_KEY'): return os.environ.get('SECRET_KEY')
     if os.path.exists(SECRET_FILE):
-        try:
-            with open(SECRET_FILE, 'r') as f:
-                return f.read().strip()
+        try: 
+            with open(SECRET_FILE, 'r') as f: return f.read().strip()
         except: pass
-    key = secrets.token_hex(32)
-    try:
-        with open(SECRET_FILE, 'w') as f:
-            f.write(key)
-    except: pass 
-    return key
+    return secrets.token_hex(32)
 
 app.config['SECRET_KEY'] = get_secret_key()
 
 # Folders
 DOWNLOAD_FOLDER = os.path.join(BASE_DIR, "downloads")
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
-DB_PATH = os.environ.get('DB_PATH', os.path.join(BASE_DIR, "users.db"))
-
 for folder in [DOWNLOAD_FOLDER, UPLOAD_FOLDER]:
-    if not os.path.exists(folder):
-        os.makedirs(folder, exist_ok=True)
+    os.makedirs(folder, exist_ok=True)
 
-# FFmpeg Detection (Windows + Linux/Render)
-if os.path.exists(os.path.join(BASE_DIR, "ffmpeg.exe")):
-    FFMPEG_PATH = os.path.join(BASE_DIR, "ffmpeg.exe") 
-elif os.path.exists(os.path.join(BASE_DIR, "ffmpeg")):
-    FFMPEG_PATH = os.path.join(BASE_DIR, "ffmpeg") 
-elif shutil.which("ffmpeg"):
-    FFMPEG_PATH = shutil.which("ffmpeg") 
-else:
-    FFMPEG_PATH = None 
-
-# --- SYSTEM DIAGNOSTICS (DEBUGGING) ---
-print("\n" + "="*40)
-print("🚀 SYSTEM STARTUP CHECKS")
-print(f"📂 Base Directory: {BASE_DIR}")
-print(f"🎥 FFmpeg Path: {FFMPEG_PATH or '❌ MISSING (Videos will fail)'}")
-if os.path.exists(COOKIE_FILE):
-    print(f"✅ COOKIES FOUND ({os.path.getsize(COOKIE_FILE)} bytes)")
-else:
-    print("❌ COOKIES NOT FOUND (Instagram downloads may fail)")
-print("="*40 + "\n")
+# FFmpeg Check
+if os.path.exists(os.path.join(BASE_DIR, "ffmpeg.exe")): FFMPEG_PATH = os.path.join(BASE_DIR, "ffmpeg.exe") 
+elif os.path.exists(os.path.join(BASE_DIR, "ffmpeg")): FFMPEG_PATH = os.path.join(BASE_DIR, "ffmpeg") 
+elif shutil.which("ffmpeg"): FFMPEG_PATH = shutil.which("ffmpeg") 
+else: FFMPEG_PATH = None 
 
 # Threading
 MAX_CONCURRENT_DOWNLOADS = int(os.environ.get('MAX_WORKERS', 2))
@@ -80,37 +56,57 @@ download_semaphore = threading.BoundedSemaphore(MAX_CONCURRENT_DOWNLOADS)
 job_status = {}
 
 # -------------------------
-# DATABASE ENGINE
+# POSTGRESQL DATABASE ENGINE
 # -------------------------
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
 def get_db_connection():
-    conn = sqlite3.connect(DB_PATH, timeout=10)
-    conn.row_factory = sqlite3.Row # Access columns by name
-    conn.execute('PRAGMA journal_mode=WAL;')
-    return conn
+    # Fallback to SQLite if no DB URL found (for local testing)
+    if not DATABASE_URL:
+        import sqlite3
+        conn = sqlite3.connect("users.db", timeout=10)
+        conn.row_factory = sqlite3.Row
+        return conn, "sqlite"
+    
+    # Connect to Render PostgreSQL
+    conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+    return conn, "postgres"
 
 def init_db():
-    conn = get_db_connection()
+    conn, db_type = get_db_connection()
     c = conn.cursor()
     
-    # Tables
-    c.execute("""CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, email TEXT, password TEXT, tokens INTEGER DEFAULT 15, last_reset DATETIME, is_admin INTEGER DEFAULT 0, plan TEXT DEFAULT 'Free')""")
-    c.execute("""CREATE TABLE IF NOT EXISTS guests (ip TEXT PRIMARY KEY, tokens INTEGER DEFAULT 5, last_reset DATETIME)""")
-    c.execute("""CREATE TABLE IF NOT EXISTS payment_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, username TEXT, plan_name TEXT, screenshot_path TEXT, status TEXT DEFAULT 'pending', timestamp DATETIME)""")
-    c.execute("""CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)""")
-    c.execute("""CREATE TABLE IF NOT EXISTS banned_ips (ip TEXT PRIMARY KEY, reason TEXT, timestamp DATETIME)""")
+    if db_type == "postgres":
+        # Postgres Syntax
+        c.execute("""CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username TEXT UNIQUE, email TEXT, password TEXT, tokens INTEGER DEFAULT 15, last_reset TIMESTAMP, is_admin INTEGER DEFAULT 0, plan TEXT DEFAULT 'Free')""")
+        c.execute("""CREATE TABLE IF NOT EXISTS guests (ip TEXT PRIMARY KEY, tokens INTEGER DEFAULT 5, last_reset TIMESTAMP)""")
+        c.execute("""CREATE TABLE IF NOT EXISTS payment_requests (id SERIAL PRIMARY KEY, user_id INTEGER, username TEXT, plan_name TEXT, screenshot_path TEXT, status TEXT DEFAULT 'pending', timestamp TIMESTAMP)""")
+        c.execute("""CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)""")
+        c.execute("""CREATE TABLE IF NOT EXISTS banned_ips (ip TEXT PRIMARY KEY, reason TEXT, timestamp TIMESTAMP)""")
+        conn.commit()
+        
+        # Create Admin
+        c.execute("SELECT * FROM users WHERE username=%s", ('ashishadmin',))
+        if not c.fetchone():
+            hashed = generate_password_hash("anu9936")
+            c.execute("INSERT INTO users (username, password, tokens, last_reset, is_admin, plan) VALUES (%s, %s, 999999, %s, 1, 'God Mode')", 
+                      ('ashishadmin', hashed, datetime.now()))
+            print("👑 Admin created in Postgres")
+            conn.commit()
 
-    # Create Admin (ashishadmin)
-    try:
+    else:
+        # SQLite Syntax (Fallback)
+        c.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, email TEXT, password TEXT, tokens INTEGER DEFAULT 15, last_reset DATETIME, is_admin INTEGER DEFAULT 0, plan TEXT DEFAULT 'Free')")
+        c.execute("CREATE TABLE IF NOT EXISTS guests (ip TEXT PRIMARY KEY, tokens INTEGER DEFAULT 5, last_reset DATETIME)")
+        c.execute("CREATE TABLE IF NOT EXISTS payment_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, username TEXT, plan_name TEXT, screenshot_path TEXT, status TEXT DEFAULT 'pending', timestamp DATETIME)")
+        # Admin
         c.execute("SELECT * FROM users WHERE username='ashishadmin'")
         if not c.fetchone():
             hashed = generate_password_hash("anu9936")
             c.execute("INSERT INTO users (username, password, tokens, last_reset, is_admin, plan) VALUES (?, ?, 999999, ?, 1, 'God Mode')", 
                       ('ashishadmin', hashed, datetime.now()))
-            print("👑 Admin 'ashishadmin' created.")
-    except Exception as e:
-        print(f"Admin init warning: {e}")
+        conn.commit()
 
-    conn.commit()
     conn.close()
 
 init_db()
@@ -119,51 +115,64 @@ init_db()
 # HELPERS
 # -------------------------
 def is_banned(ip):
-    conn = get_db_connection()
-    banned = conn.execute("SELECT * FROM banned_ips WHERE ip=?", (ip,)).fetchone()
+    conn, t = get_db_connection()
+    c = conn.cursor()
+    q = "SELECT * FROM banned_ips WHERE ip=%s" if t == "postgres" else "SELECT * FROM banned_ips WHERE ip=?"
+    c.execute(q, (ip,))
+    banned = c.fetchone()
     conn.close()
     return banned is not None
 
 def check_tokens(ip, user_id=None):
-    conn = get_db_connection()
+    conn, t = get_db_connection()
+    c = conn.cursor()
     now = datetime.now()
     
     if user_id:
-        row = conn.execute("SELECT tokens, last_reset, plan FROM users WHERE id=?", (user_id,)).fetchone()
+        q = "SELECT tokens, last_reset, plan FROM users WHERE id=%s" if t == "postgres" else "SELECT tokens, last_reset, plan FROM users WHERE id=?"
+        c.execute(q, (user_id,))
+        row = c.fetchone()
         if not row: return 0, False
-        tokens, last_reset_str, plan = row['tokens'], row['last_reset'], row['plan']
-        
-        try: last_reset = datetime.strptime(str(last_reset_str).split('.')[0], "%Y-%m-%d %H:%M:%S")
-        except: last_reset = datetime.min
-
-        if tokens < 15 and (now - last_reset > timedelta(hours=12)):
-            conn.execute("UPDATE users SET tokens=15, last_reset=? WHERE id=?", (now, user_id))
-            conn.commit()
-            tokens = 15
-        
-        if plan == "God Mode": tokens = 999999
-        return tokens, False
+        tokens, last_reset, plan = row['tokens'], row['last_reset'], row['plan']
     else:
-        row = conn.execute("SELECT tokens, last_reset FROM guests WHERE ip=?", (ip,)).fetchone()
+        q = "SELECT tokens, last_reset FROM guests WHERE ip=%s" if t == "postgres" else "SELECT tokens, last_reset FROM guests WHERE ip=?"
+        c.execute(q, (ip,))
+        row = c.fetchone()
         if not row:
-            conn.execute("INSERT INTO guests (ip, tokens, last_reset) VALUES (?, 5, ?)", (ip, now))
+            iq = "INSERT INTO guests (ip, tokens, last_reset) VALUES (%s, 5, %s)" if t == "postgres" else "INSERT INTO guests (ip, tokens, last_reset) VALUES (?, 5, ?)"
+            c.execute(iq, (ip, now))
             conn.commit()
             return 5, False
-        tokens, last_reset_str = row['tokens'], row['last_reset']
-        
-        try: last_reset = datetime.strptime(str(last_reset_str).split('.')[0], "%Y-%m-%d %H:%M:%S")
+        tokens, last_reset = row['tokens'], row['last_reset']
+        plan = "Guest"
+
+    # Handle Datetime (Postgres returns object, SQLite returns string)
+    if isinstance(last_reset, str):
+        try: last_reset = datetime.strptime(last_reset.split('.')[0], "%Y-%m-%d %H:%M:%S")
         except: last_reset = datetime.min
-            
-        if now - last_reset > timedelta(hours=12):
-            conn.execute("UPDATE guests SET tokens=5, last_reset=? WHERE ip=?", (now, ip))
-            conn.commit()
-            tokens = 5
-        return tokens, False
+    
+    if tokens < 15 and (now - last_reset > timedelta(hours=12)):
+        uq = "UPDATE users SET tokens=15, last_reset=%s WHERE id=%s" if t == "postgres" and user_id else "UPDATE users SET tokens=15, last_reset=? WHERE id=?"
+        gq = "UPDATE guests SET tokens=5, last_reset=%s WHERE ip=%s" if t == "postgres" and not user_id else "UPDATE guests SET tokens=5, last_reset=? WHERE ip=?"
+        
+        if user_id: c.execute(uq, (now, user_id))
+        else: c.execute(gq, (now, ip))
+        conn.commit()
+        tokens = 15 if user_id else 5
+        
+    if plan == "God Mode": tokens = 999999
+    conn.close()
+    return tokens, False
 
 def consume_token(ip, user_id=None):
-    conn = get_db_connection()
-    if user_id: conn.execute("UPDATE users SET tokens = tokens - 1 WHERE id=?", (user_id,))
-    else: conn.execute("UPDATE guests SET tokens = tokens - 1 WHERE ip=?", (ip,))
+    conn, t = get_db_connection()
+    c = conn.cursor()
+    if user_id:
+        q = "UPDATE users SET tokens = tokens - 1 WHERE id=%s" if t == "postgres" else "UPDATE users SET tokens = tokens - 1 WHERE id=?"
+        c.execute(q, (user_id,))
+    else:
+        q = "UPDATE guests SET tokens = tokens - 1 WHERE ip=%s" if t == "postgres" else "UPDATE guests SET tokens = tokens - 1 WHERE ip=?"
+        c.execute(q, (ip,))
     conn.commit()
     conn.close()
 
@@ -177,13 +186,16 @@ def get_user_from_token(request):
 def is_admin_request(request):
     user_id = get_user_from_token(request)
     if not user_id: return False
-    conn = get_db_connection()
-    row = conn.execute("SELECT is_admin FROM users WHERE id=?", (user_id,)).fetchone()
+    conn, t = get_db_connection()
+    c = conn.cursor()
+    q = "SELECT is_admin FROM users WHERE id=%s" if t == "postgres" else "SELECT is_admin FROM users WHERE id=?"
+    c.execute(q, (user_id,))
+    row = c.fetchone()
     conn.close()
     return row and row['is_admin'] == 1
 
 # -------------------------
-# GENERAL ROUTES
+# ROUTES
 # -------------------------
 @app.route('/')
 def index(): return send_file('index.html')
@@ -196,20 +208,24 @@ def serve_static(path):
 @app.route("/api/register", methods=["POST"])
 def register():
     data = request.json
+    conn, t = get_db_connection()
+    c = conn.cursor()
     try:
-        conn = get_db_connection()
-        conn.execute("INSERT INTO users(username, email, password, tokens, last_reset, is_admin, plan) VALUES (?, ?, ?, 15, ?, 0, 'Free')", 
-                  (data["username"].lower(), data.get("email",""), generate_password_hash(data["password"]), datetime.now()))
+        q = "INSERT INTO users(username, email, password, tokens, last_reset, is_admin, plan) VALUES (%s, %s, %s, 15, %s, 0, 'Free')" if t == "postgres" else "INSERT INTO users(username, email, password, tokens, last_reset, is_admin, plan) VALUES (?, ?, ?, 15, ?, 0, 'Free')"
+        c.execute(q, (data["username"].lower(), data.get("email",""), generate_password_hash(data["password"]), datetime.now()))
         conn.commit()
-        conn.close()
         return jsonify({"message": "User registered"}), 201
     except: return jsonify({"message": "Username taken"}), 409
+    finally: conn.close()
 
 @app.route("/api/login", methods=["POST"])
 def login():
     data = request.json
-    conn = get_db_connection()
-    user = conn.execute("SELECT id, password FROM users WHERE username=?", (data["username"].lower(),)).fetchone()
+    conn, t = get_db_connection()
+    c = conn.cursor()
+    q = "SELECT id, password FROM users WHERE username=%s" if t == "postgres" else "SELECT id, password FROM users WHERE username=?"
+    c.execute(q, (data["username"].lower(),))
+    user = c.fetchone()
     conn.close()
     if user and check_password_hash(user['password'], data["password"]):
         token = jwt.encode({'user_id': user['id'], 'exp': datetime.utcnow() + timedelta(hours=24)}, app.config['SECRET_KEY'], algorithm="HS256")
@@ -219,17 +235,26 @@ def login():
 @app.route("/api/status", methods=["GET"])
 def get_status():
     user_id = get_user_from_token(request)
-    conn = get_db_connection()
+    conn, t = get_db_connection()
+    c = conn.cursor()
     
-    # Settings
-    m_row = conn.execute("SELECT value FROM settings WHERE key='maintenance'").fetchone()
-    a_row = conn.execute("SELECT value FROM settings WHERE key='announcement'").fetchone()
+    # Settings (Safe table check)
+    try:
+        q = "SELECT value FROM settings WHERE key=%s" if t == "postgres" else "SELECT value FROM settings WHERE key=?"
+        c.execute(q, ('maintenance',))
+        m_row = c.fetchone()
+        c.execute(q, ('announcement',))
+        a_row = c.fetchone()
+    except: m_row = None; a_row = None
+
     maintenance = m_row['value'] if m_row else 'false'
     announcement = a_row['value'] if a_row else ''
     
     username, is_admin, plan = "", False, "Guest"
     if user_id:
-        row = conn.execute("SELECT username, is_admin, plan FROM users WHERE id=?", (user_id,)).fetchone()
+        q = "SELECT username, is_admin, plan FROM users WHERE id=%s" if t == "postgres" else "SELECT username, is_admin, plan FROM users WHERE id=?"
+        c.execute(q, (user_id,))
+        row = c.fetchone()
         if row: username, is_admin, plan = row['username'], (row['is_admin'] == 1), row['plan']
     conn.close()
     
@@ -247,10 +272,15 @@ def pay_req():
     if file:
         filename = secure_filename(f"{user_id}_{int(time.time())}_{file.filename}")
         file.save(os.path.join(UPLOAD_FOLDER, filename))
-        conn = get_db_connection()
-        u = conn.execute("SELECT username FROM users WHERE id=?", (user_id,)).fetchone()['username']
-        conn.execute("INSERT INTO payment_requests (user_id, username, plan_name, screenshot_path, status, timestamp) VALUES (?, ?, ?, ?, 'pending', ?)",
-                (user_id, u, request.form.get("plan_name"), filename, datetime.now()))
+        conn, t = get_db_connection()
+        c = conn.cursor()
+        
+        uq = "SELECT username FROM users WHERE id=%s" if t == "postgres" else "SELECT username FROM users WHERE id=?"
+        c.execute(uq, (user_id,))
+        u = c.fetchone()['username']
+        
+        iq = "INSERT INTO payment_requests (user_id, username, plan_name, screenshot_path, status, timestamp) VALUES (%s, %s, %s, %s, 'pending', %s)" if t == "postgres" else "INSERT INTO payment_requests (user_id, username, plan_name, screenshot_path, status, timestamp) VALUES (?, ?, ?, ?, 'pending', ?)"
+        c.execute(iq, (user_id, u, request.form.get("plan_name"), filename, datetime.now()))
         conn.commit()
         conn.close()
         return jsonify({"message": "Submitted"})
@@ -262,51 +292,65 @@ def serve_up(filename):
     return send_from_directory(UPLOAD_FOLDER, filename)
 
 # -------------------------
-# ADMIN ROUTES (RESTORED)
+# ADMIN API (POSTGRES COMPATIBLE)
 # -------------------------
 @app.route("/api/admin/settings", methods=["GET", "POST"])
 def manage_settings():
     if not is_admin_request(request): return jsonify({"error": "Unauthorized"}), 403
-    conn = get_db_connection()
+    conn, t = get_db_connection()
+    c = conn.cursor()
     if request.method == "POST":
         data = request.json
-        if "maintenance" in data: conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('maintenance', ?)", (str(data['maintenance']).lower(),))
-        if "announcement" in data: conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('announcement', ?)", (data['announcement'],))
+        if t == "postgres":
+            if "maintenance" in data: c.execute("INSERT INTO settings (key, value) VALUES ('maintenance', %s) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", (str(data['maintenance']).lower(),))
+            if "announcement" in data: c.execute("INSERT INTO settings (key, value) VALUES ('announcement', %s) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", (data['announcement'],))
+        else:
+            if "maintenance" in data: c.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('maintenance', ?)", (str(data['maintenance']).lower(),))
+            if "announcement" in data: c.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('announcement', ?)", (data['announcement'],))
         conn.commit()
     
-    m = conn.execute("SELECT value FROM settings WHERE key='maintenance'").fetchone()
-    a = conn.execute("SELECT value FROM settings WHERE key='announcement'").fetchone()
+    q = "SELECT value FROM settings WHERE key=%s" if t == "postgres" else "SELECT value FROM settings WHERE key=?"
+    c.execute(q, ('maintenance',))
+    m = c.fetchone()
+    c.execute(q, ('announcement',))
+    a = c.fetchone()
     conn.close()
     return jsonify({"maintenance": (m['value'] == 'true') if m else False, "announcement": a['value'] if a else ""})
 
 @app.route("/api/admin/ban", methods=["GET", "POST", "DELETE"])
 def manage_bans():
     if not is_admin_request(request): return jsonify({"error": "Unauthorized"}), 403
-    conn = get_db_connection()
+    conn, t = get_db_connection()
+    c = conn.cursor()
     if request.method == "GET":
-        bans = [dict(row) for row in conn.execute("SELECT * FROM banned_ips").fetchall()]
+        c.execute("SELECT * FROM banned_ips")
+        bans = [dict(row) for row in c.fetchall()]
         conn.close()
         return jsonify(bans)
     
     if request.method == "POST":
         ip = request.json.get("ip")
-        if ip: conn.execute("INSERT OR REPLACE INTO banned_ips (ip, reason, timestamp) VALUES (?, 'Admin Ban', ?)", (ip, datetime.now()))
+        if ip:
+            if t == "postgres": c.execute("INSERT INTO banned_ips (ip, reason, timestamp) VALUES (%s, 'Admin Ban', %s) ON CONFLICT (ip) DO UPDATE SET timestamp = EXCLUDED.timestamp", (ip, datetime.now()))
+            else: c.execute("INSERT OR REPLACE INTO banned_ips (ip, reason, timestamp) VALUES (?, 'Admin Ban', ?)", (ip, datetime.now()))
         conn.commit()
-        conn.close()
-        return jsonify({"message": "IP Banned"})
 
     if request.method == "DELETE":
         ip = request.json.get("ip")
-        conn.execute("DELETE FROM banned_ips WHERE ip=?", (ip,))
+        q = "DELETE FROM banned_ips WHERE ip=%s" if t == "postgres" else "DELETE FROM banned_ips WHERE ip=?"
+        c.execute(q, (ip,))
         conn.commit()
-        conn.close()
-        return jsonify({"message": "IP Unbanned"})
+    
+    conn.close()
+    return jsonify({"message": "Updated"})
 
 @app.route("/api/admin/requests", methods=["GET"])
 def get_requests():
     if not is_admin_request(request): return jsonify({"error": "Unauthorized"}), 403
-    conn = get_db_connection()
-    rows = conn.execute("SELECT * FROM payment_requests WHERE status='pending' ORDER BY timestamp DESC").fetchall()
+    conn, t = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM payment_requests WHERE status='pending' ORDER BY timestamp DESC")
+    rows = c.fetchall()
     conn.close()
     return jsonify({"requests": [dict(row) for row in rows]})
 
@@ -314,16 +358,22 @@ def get_requests():
 def approve_request():
     if not is_admin_request(request): return jsonify({"error": "Unauthorized"}), 403
     data = request.json
-    conn = get_db_connection()
-    req = conn.execute("SELECT user_id, plan_name FROM payment_requests WHERE id=?", (data.get("request_id"),)).fetchone()
+    conn, t = get_db_connection()
+    c = conn.cursor()
+    q = "SELECT user_id, plan_name FROM payment_requests WHERE id=%s" if t == "postgres" else "SELECT user_id, plan_name FROM payment_requests WHERE id=?"
+    c.execute(q, (data.get("request_id"),))
+    req = c.fetchone()
     if not req: return jsonify({"error": "Not found"}), 404
     
     if data.get("action") == "approve":
         tokens = 999999 if "God" in req['plan_name'] else 50
-        conn.execute("UPDATE users SET tokens = tokens + ?, plan = ? WHERE id=?", (tokens, req['plan_name'], req['user_id']))
-        conn.execute("UPDATE payment_requests SET status='approved' WHERE id=?", (data.get("request_id"),))
+        uq = "UPDATE users SET tokens = tokens + %s, plan = %s WHERE id=%s" if t == "postgres" else "UPDATE users SET tokens = tokens + ?, plan = ? WHERE id=?"
+        pq = "UPDATE payment_requests SET status='approved' WHERE id=%s" if t == "postgres" else "UPDATE payment_requests SET status='approved' WHERE id=?"
+        c.execute(uq, (tokens, req['plan_name'], req['user_id']))
+        c.execute(pq, (data.get("request_id"),))
     else:
-        conn.execute("UPDATE payment_requests SET status='rejected' WHERE id=?", (data.get("request_id"),))
+        pq = "UPDATE payment_requests SET status='rejected' WHERE id=%s" if t == "postgres" else "UPDATE payment_requests SET status='rejected' WHERE id=?"
+        c.execute(pq, (data.get("request_id"),))
     conn.commit()
     conn.close()
     return jsonify({"message": "Processed"})
@@ -331,16 +381,20 @@ def approve_request():
 @app.route("/api/admin/users", methods=["GET"])
 def get_all_users():
     if not is_admin_request(request): return jsonify({"error": "Unauthorized"}), 403
-    conn = get_db_connection()
-    users = [dict(row) for row in conn.execute("SELECT id, username, email, tokens, is_admin, plan FROM users").fetchall()]
+    conn, t = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT id, username, email, tokens, is_admin, plan FROM users")
+    users = [dict(row) for row in c.fetchall()]
     conn.close()
     return jsonify({"users": users})
 
 @app.route("/api/admin/credits", methods=["POST"])
 def admin_add_credits():
     if not is_admin_request(request): return jsonify({"error": "Unauthorized"}), 403
-    conn = get_db_connection()
-    conn.execute("UPDATE users SET tokens = tokens + ? WHERE id=?", (int(request.json.get("amount",0)), request.json.get("user_id")))
+    conn, t = get_db_connection()
+    c = conn.cursor()
+    q = "UPDATE users SET tokens = tokens + %s WHERE id=%s" if t == "postgres" else "UPDATE users SET tokens = tokens + ? WHERE id=?"
+    c.execute(q, (int(request.json.get("amount",0)), request.json.get("user_id")))
     conn.commit()
     conn.close()
     return jsonify({"message": "Updated"})
@@ -348,8 +402,10 @@ def admin_add_credits():
 @app.route("/api/admin/promote", methods=["POST"])
 def promote():
     if not is_admin_request(request): return jsonify({"error": "Unauthorized"}), 403
-    conn = get_db_connection()
-    conn.execute("UPDATE users SET is_admin = ? WHERE id = ?", (1 if request.json.get("is_admin") else 0, request.json.get("user_id")))
+    conn, t = get_db_connection()
+    c = conn.cursor()
+    q = "UPDATE users SET is_admin = %s WHERE id = %s" if t == "postgres" else "UPDATE users SET is_admin = ? WHERE id = ?"
+    c.execute(q, (1 if request.json.get("is_admin") else 0, request.json.get("user_id")))
     conn.commit()
     conn.close()
     return jsonify({"message": "Updated"})
@@ -357,8 +413,10 @@ def promote():
 @app.route("/api/admin/user/<int:user_id>", methods=["DELETE"])
 def delete_user(user_id):
     if not is_admin_request(request): return jsonify({"error": "Unauthorized"}), 403
-    conn = get_db_connection()
-    conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    conn, t = get_db_connection()
+    c = conn.cursor()
+    q = "DELETE FROM users WHERE id = %s" if t == "postgres" else "DELETE FROM users WHERE id = ?"
+    c.execute(q, (user_id,))
     conn.commit()
     conn.close()
     return jsonify({"message": "Deleted"})
@@ -367,15 +425,61 @@ def delete_user(user_id):
 def admin_reset_pass():
     if not is_admin_request(request): return jsonify({"error": "Unauthorized"}), 403
     hashed = generate_password_hash(request.json.get("password"))
-    conn = get_db_connection()
-    conn.execute("UPDATE users SET password = ? WHERE id = ?", (hashed, request.json.get("user_id")))
+    conn, t = get_db_connection()
+    c = conn.cursor()
+    q = "UPDATE users SET password = %s WHERE id = %s" if t == "postgres" else "UPDATE users SET password = ? WHERE id = ?"
+    c.execute(q, (hashed, request.json.get("user_id")))
     conn.commit()
     conn.close()
     return jsonify({"message": "Reset"})
 
 # -------------------------
-# DOWNLOADER LOGIC (WITH COOKIES)
+# DOWNLOADER LOGIC (OPTIMIZED)
 # -------------------------
+def process_download(job_id, url, fmt_id):
+    with download_semaphore:
+        job_status[job_id]["status"] = "downloading"
+        def progress_hook(d):
+            if d["status"] == "downloading":
+                raw_percent = d.get("_percent_str", "0%")
+                clean_percent = re.sub(r'\x1b\[[0-9;]*m', '', raw_percent).strip()
+                job_status[job_id].update({"percent": clean_percent.replace("%",""), "speed": d.get("_speed_str", "N/A")})
+
+        ydl_opts = {
+            "outtmpl": os.path.join(DOWNLOAD_FOLDER, f"{job_id}_%(title)s.%(ext)s"),
+            "progress_hooks": [progress_hook],
+            "quiet": True,
+            "concurrent_fragment_downloads": 10,
+            "buffersize": 1024 * 1024,
+            "http_headers": { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" }
+        }
+        
+        if os.path.exists(COOKIE_FILE): ydl_opts['cookiefile'] = COOKIE_FILE
+        if FFMPEG_PATH: ydl_opts["ffmpeg_location"] = FFMPEG_PATH
+
+        if "mp3" in fmt_id:
+            ydl_opts["format"] = "bestaudio/best"
+            if FFMPEG_PATH: ydl_opts["postprocessors"] = [{"key": "FFmpegExtractAudio","preferredcodec": "mp3"}]
+        elif fmt_id == "best": ydl_opts["format"] = "best"
+        elif "video" in fmt_id:
+            height = fmt_id.replace("video-", "")
+            if FFMPEG_PATH:
+                ydl_opts["format"] = f"best[height<={height}]/bestvideo[height<={height}]+bestaudio/best[height<={height}]"
+                ydl_opts["merge_output_format"] = "mp4"
+            else: ydl_opts["format"] = f"best[height<={height}]"
+
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.extract_info(url, download=True)
+                for f in os.listdir(DOWNLOAD_FOLDER):
+                    if f.startswith(job_id):
+                        job_status[job_id].update({"status": "completed", "file": os.path.join(DOWNLOAD_FOLDER, f), "filename": f})
+                        return
+                raise Exception("File missing")
+        except Exception as e:
+            job_status[job_id].update({"status": "error", "error": str(e)})
+
+# API INFO ROUTES (Keep original logic)
 def format_bytes(size):
     if not size: return "N/A"
     power = 2**10
@@ -390,17 +494,10 @@ def safe_float(val):
 
 def get_video_formats(url):
     ydl_opts = { 
-        "quiet": True, 
-        "no_warnings": True, 
-        "noplaylist": True, 
-        "extract_flat": "in_playlist", 
+        "quiet": True, "no_warnings": True, "noplaylist": True, "extract_flat": "in_playlist",
         "http_headers": { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" }
     }
-    
-    # 🍪 COOKIES LOAD
-    if os.path.exists(COOKIE_FILE):
-        ydl_opts['cookiefile'] = COOKIE_FILE
-
+    if os.path.exists(COOKIE_FILE): ydl_opts['cookiefile'] = COOKIE_FILE
     if FFMPEG_PATH: ydl_opts["ffmpeg_location"] = FFMPEG_PATH
 
     try:
@@ -430,85 +527,8 @@ def get_video_formats(url):
                 formats_list.sort(key=lambda x: x.get('height', 0), reverse=True)
 
             return { "title": info.get("title", "Video"), "thumbnail": info.get("thumbnail", ""), "duration": info.get("duration_string", "N/A"), "formats": formats_list }
-    except Exception as e:
-        print(f"❌ INFO ERROR: {e}")
-        return None
+    except Exception as e: return None
 
-def process_download(job_id, url, fmt_id):
-    with download_semaphore:
-        job_status[job_id]["status"] = "downloading"
-        
-        def progress_hook(d):
-            if d["status"] == "downloading":
-                # Clean up percentage string to avoid errors
-                raw_percent = d.get("_percent_str", "0%")
-                clean_percent = re.sub(r'\x1b\[[0-9;]*m', '', raw_percent).strip()
-                job_status[job_id].update({"percent": clean_percent.replace("%",""), "speed": d.get("_speed_str", "N/A")})
-
-        ydl_opts = {
-            "outtmpl": os.path.join(DOWNLOAD_FOLDER, f"{job_id}_%(title)s.%(ext)s"),
-            "progress_hooks": [progress_hook],
-            "quiet": True,
-            
-            # --- 🚀 SPEED OPTIMIZATION SETTINGS ---
-            "format": "best", # Avoid merging if possible (merging takes CPU time)
-            "concurrent_fragment_downloads": 10, # Download 10 parts at once (Faster on Cloud)
-            "buffersize": 1024 * 1024, # Larger buffer (1MB) for stable speed
-            "http_headers": { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
-            
-            # Use aria2c if available (optional, but faster external downloader)
-            # "external_downloader": "aria2c", 
-            # "external_downloader_args": ["-x", "16", "-k", "1M"]
-        }
-        
-        # Cookie Check
-        if os.path.exists(COOKIE_FILE):
-            ydl_opts['cookiefile'] = COOKIE_FILE
-
-        if FFMPEG_PATH: ydl_opts["ffmpeg_location"] = FFMPEG_PATH
-
-        # --- OPTIMIZED FORMAT SELECTION ---
-        # If user wants MP3, we MUST use FFmpeg (CPU intensive but necessary)
-        if "mp3" in fmt_id:
-            ydl_opts["format"] = "bestaudio/best"
-            if FFMPEG_PATH:
-                ydl_opts["postprocessors"] = [{
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": "mp3",
-                    "preferredquality": "128"
-                }]
-        
-        # If user wants Video, try to avoid "merging" video+audio if a single file exists
-        elif fmt_id == "best": 
-            ydl_opts["format"] = "best" # 'best' usually gets a single pre-merged file (Fastest)
-        
-        elif "video" in fmt_id:
-            height = fmt_id.replace("video-", "")
-            # Try to find a single file with that height first to avoid FFmpeg merge
-            if FFMPEG_PATH:
-                ydl_opts["format"] = f"best[height<={height}]/bestvideo[height<={height}]+bestaudio/best[height<={height}]"
-                ydl_opts["merge_output_format"] = "mp4"
-            else:
-                 ydl_opts["format"] = f"best[height<={height}]"
-
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.extract_info(url, download=True)
-                # Find the file that was just created
-                for f in os.listdir(DOWNLOAD_FOLDER):
-                    if f.startswith(job_id):
-                        job_status[job_id].update({
-                            "status": "completed", 
-                            "file": os.path.join(DOWNLOAD_FOLDER, f), 
-                            "filename": f
-                        })
-                        return
-                raise Exception("File missing after download")
-        except Exception as e:
-            print(f"❌ DOWNLOAD ERROR: {e}")
-            job_status[job_id].update({"status": "error", "error": str(e)})
-
-            
 @app.route("/api/info", methods=["POST"])
 def api_info(): 
     res = get_video_formats(request.json.get("url"))
@@ -517,16 +537,15 @@ def api_info():
 @app.route("/api/download", methods=["POST"])
 def api_download():
     ip = request.remote_addr
-    
-    # Check Bans
     if is_banned(ip): return jsonify({"error": "BANNED", "message": "IP Banned"}), 403
     
-    # Check Maintenance
-    conn = get_db_connection()
-    m = conn.execute("SELECT value FROM settings WHERE key='maintenance'").fetchone()
+    conn, t = get_db_connection()
+    c = conn.cursor()
+    q = "SELECT value FROM settings WHERE key=%s" if t == "postgres" else "SELECT value FROM settings WHERE key=?"
+    c.execute(q, ('maintenance',))
+    m = c.fetchone()
     conn.close()
-    if m and m['value'] == 'true' and not is_admin_request(request):
-        return jsonify({"error": "MAINTENANCE", "message": "Under maintenance"}), 503
+    if m and m['value'] == 'true' and not is_admin_request(request): return jsonify({"error": "MAINTENANCE", "message": "Under maintenance"}), 503
 
     user_id = get_user_from_token(request)
     tokens_left, _ = check_tokens(ip, user_id)
@@ -558,8 +577,7 @@ def cleanup_files():
             try:
                 for f in os.listdir(folder):
                     f_path = os.path.join(folder, f)
-                    if os.path.isfile(f_path) and now - os.path.getmtime(f_path) > 3600:
-                        os.remove(f_path)
+                    if os.path.isfile(f_path) and now - os.path.getmtime(f_path) > 3600: os.remove(f_path)
             except: pass
         time.sleep(600)
 threading.Thread(target=cleanup_files, daemon=True).start()
