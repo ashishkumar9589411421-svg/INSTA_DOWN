@@ -103,6 +103,9 @@ def init_db():
         c.execute("CREATE TABLE IF NOT EXISTS guests (ip TEXT PRIMARY KEY, tokens INTEGER DEFAULT 5, last_reset DATETIME)")
         c.execute("CREATE TABLE IF NOT EXISTS payment_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, username TEXT, plan_name TEXT, screenshot_path TEXT, status TEXT DEFAULT 'pending', timestamp DATETIME)")
         c.execute("CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT, message TEXT, timestamp DATETIME)")
+        c.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
+        c.execute("CREATE TABLE IF NOT EXISTS banned_ips (ip TEXT PRIMARY KEY, reason TEXT, timestamp DATETIME)")
+        
         # Admin
         c.execute("SELECT * FROM users WHERE username='ashishadmin'")
         if not c.fetchone():
@@ -512,6 +515,7 @@ def safe_float(val):
 
 def get_video_formats(url):
     # ANDROID MODE ENABLED 📱
+    # This specific configuration makes Instagram think we are the Android App
     ydl_opts = { 
         "quiet": True, 
         "no_warnings": True, 
@@ -605,38 +609,6 @@ def process_download(job_id, url, fmt_id):
                 raise Exception("File missing")
         except Exception as e:
             job_status[job_id].update({"status": "error", "error": str(e)})
-
-@app.route("/api/info", methods=["POST"])
-def api_info(): 
-    res = get_video_formats(request.json.get("url"))
-    return jsonify(res) if res else (jsonify({"error": "Failed"}), 400)
-
-@app.route("/api/download", methods=["POST"])
-def api_download():
-    ip = request.remote_addr
-    if is_banned(ip): return jsonify({"error": "BANNED", "message": "IP Banned"}), 403
-    
-    conn, t = get_db_connection()
-    c = conn.cursor()
-    q = "SELECT value FROM settings WHERE key=%s" if t == "postgres" else "SELECT value FROM settings WHERE key=?"
-    c.execute(q, ('maintenance',))
-    m = c.fetchone()
-    conn.close()
-    if m and m['value'] == 'true' and not is_admin_request(request): return jsonify({"error": "MAINTENANCE", "message": "Under maintenance"}), 503
-
-    user_id = get_user_from_token(request)
-    tokens_left, _ = check_tokens(ip, user_id)
-
-    if tokens_left <= 0:
-        msg = "Daily limit reached (15/15)." if user_id else "Guest limit reached (5/5). Login for more!"
-        return jsonify({"error": "LIMIT_REACHED", "message": msg}), 403
-
-    consume_token(ip, user_id)
-    data = request.json
-    job_id = str(uuid.uuid4())
-    job_status[job_id] = {"status": "queued", "percent": "0"}
-    executor.submit(process_download, job_id, data.get("url"), data.get("format_id"))
-    return jsonify({"job_id": job_id})
 
 @app.route("/api/progress/<job_id>")
 def api_progress(job_id): return jsonify(job_status.get(job_id, {"status": "unknown"}))
