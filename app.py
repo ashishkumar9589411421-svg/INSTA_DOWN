@@ -21,7 +21,6 @@ from concurrent.futures import ThreadPoolExecutor
 # -------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__, static_folder=BASE_DIR, static_url_path='')
-# Fix 405 Errors by allowing cross-origin properly
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # Secrets & Cookies
@@ -84,42 +83,59 @@ def init_db():
     conn, db_type = get_db_connection()
     c = conn.cursor()
     
-    # Common Schema
-    users_sql = """CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username TEXT UNIQUE, email TEXT, password TEXT, tokens INTEGER DEFAULT 15, last_reset TIMESTAMP, is_admin INTEGER DEFAULT 0, plan TEXT DEFAULT 'Free', referral_code TEXT UNIQUE, referred_by TEXT)"""
-    guests_sql = """CREATE TABLE IF NOT EXISTS guests (ip TEXT PRIMARY KEY, tokens INTEGER DEFAULT 5, last_reset TIMESTAMP)"""
-    req_sql = """CREATE TABLE IF NOT EXISTS payment_requests (id SERIAL PRIMARY KEY, user_id INTEGER, username TEXT, plan_name TEXT, screenshot_path TEXT, status TEXT DEFAULT 'pending', timestamp TIMESTAMP)"""
-    msg_sql = """CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, name TEXT, email TEXT, message TEXT, timestamp TIMESTAMP)"""
-    
-    if db_type == "sqlite":
-        # Adjust for SQLite
-        users_sql = users_sql.replace("SERIAL PRIMARY KEY", "INTEGER PRIMARY KEY AUTOINCREMENT").replace("TIMESTAMP", "DATETIME")
-        guests_sql = guests_sql.replace("TIMESTAMP", "DATETIME")
-        req_sql = req_sql.replace("SERIAL PRIMARY KEY", "INTEGER PRIMARY KEY AUTOINCREMENT").replace("TIMESTAMP", "DATETIME")
-        msg_sql = msg_sql.replace("SERIAL PRIMARY KEY", "INTEGER PRIMARY KEY AUTOINCREMENT").replace("TIMESTAMP", "DATETIME")
-
-    # Execute
-    try:
-        c.execute(users_sql)
-        c.execute(guests_sql)
-        c.execute(req_sql)
-        c.execute(msg_sql)
+    # 1. CREATE TABLES IF THEY DON'T EXIST
+    if db_type == "postgres":
+        # Postgres Syntax
+        c.execute("""CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username TEXT UNIQUE, email TEXT, password TEXT, tokens INTEGER DEFAULT 15, last_reset TIMESTAMP, is_admin INTEGER DEFAULT 0, plan TEXT DEFAULT 'Free', referral_code TEXT UNIQUE, referred_by TEXT)""")
+        c.execute("""CREATE TABLE IF NOT EXISTS guests (ip TEXT PRIMARY KEY, tokens INTEGER DEFAULT 5, last_reset TIMESTAMP)""")
+        c.execute("""CREATE TABLE IF NOT EXISTS payment_requests (id SERIAL PRIMARY KEY, user_id INTEGER, username TEXT, plan_name TEXT, screenshot_path TEXT, status TEXT DEFAULT 'pending', timestamp TIMESTAMP)""")
+        c.execute("""CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)""")
+        c.execute("""CREATE TABLE IF NOT EXISTS banned_ips (ip TEXT PRIMARY KEY, reason TEXT, timestamp TIMESTAMP)""")
+        c.execute("""CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, name TEXT, email TEXT, message TEXT, timestamp TIMESTAMP)""")
+        conn.commit()
+    else:
+        # SQLite Syntax
+        c.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, email TEXT, password TEXT, tokens INTEGER DEFAULT 15, last_reset DATETIME, is_admin INTEGER DEFAULT 0, plan TEXT DEFAULT 'Free', referral_code TEXT UNIQUE, referred_by TEXT)")
+        c.execute("CREATE TABLE IF NOT EXISTS guests (ip TEXT PRIMARY KEY, tokens INTEGER DEFAULT 5, last_reset DATETIME)")
+        c.execute("CREATE TABLE IF NOT EXISTS payment_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, username TEXT, plan_name TEXT, screenshot_path TEXT, status TEXT DEFAULT 'pending', timestamp DATETIME)")
+        c.execute("CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT, message TEXT, timestamp DATETIME)")
         c.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
-        c.execute("CREATE TABLE IF NOT EXISTS banned_ips (ip TEXT PRIMARY KEY, reason TEXT, timestamp TIMESTAMP)".replace("TIMESTAMP", "DATETIME" if db_type=="sqlite" else "TIMESTAMP"))
-        
-        # Admin Creation
-        user_ph = "?" if db_type == "sqlite" else "%s"
+        c.execute("CREATE TABLE IF NOT EXISTS banned_ips (ip TEXT PRIMARY KEY, reason TEXT, timestamp DATETIME)")
+        conn.commit()
+
+    # 2. AUTO-FIX MISSING COLUMNS (DATABASE MIGRATION)
+    # This prevents the "Username Taken" error if your DB is old
+    try:
+        if db_type == "postgres":
+            c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code TEXT UNIQUE")
+            c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by TEXT")
+            c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT")
+        else:
+            # SQLite check columns first
+            c.execute("PRAGMA table_info(users)")
+            cols = [info[1] for info in c.fetchall()]
+            if "referral_code" not in cols: c.execute("ALTER TABLE users ADD COLUMN referral_code TEXT UNIQUE")
+            if "referred_by" not in cols: c.execute("ALTER TABLE users ADD COLUMN referred_by TEXT")
+            if "email" not in cols: c.execute("ALTER TABLE users ADD COLUMN email TEXT")
+        conn.commit()
+        print("✅ Database Schema Verified/Updated")
+    except Exception as e:
+        print(f"⚠️ DB Update Warning (Ignore if working): {e}")
+
+    # 3. CREATE ADMIN
+    try:
+        user_ph = "%s" if db_type == "postgres" else "?"
         c.execute(f"SELECT * FROM users WHERE username={user_ph}", ('ashishadmin',))
         if not c.fetchone():
             hashed = generate_password_hash("anu9936")
             insert_sql = f"INSERT INTO users (username, password, tokens, last_reset, is_admin, plan) VALUES ({user_ph}, {user_ph}, 999999, {user_ph}, 1, 'God Mode')"
             c.execute(insert_sql, ('ashishadmin', hashed, datetime.now()))
-            print("👑 Admin created")
-        
-        conn.commit()
+            print("👑 Admin 'ashishadmin' created")
+            conn.commit()
     except Exception as e:
-        print(f"DB Init Error: {e}")
-    finally:
-        conn.close()
+        print(f"Admin Init Error: {e}")
+
+    conn.close()
 
 init_db()
 
@@ -181,7 +197,8 @@ def get_user_from_token(request):
 def is_admin_request(request):
     user_id = get_user_from_token(request)
     if not user_id: return False
-    conn, t = get_db_connection(); c = conn.cursor()
+    conn, t = get_db_connection()
+    c = conn.cursor()
     q = "SELECT is_admin FROM users WHERE id=%s" if t == "postgres" else "SELECT is_admin FROM users WHERE id=?"
     c.execute(q, (user_id,)); row = c.fetchone(); conn.close()
     return row and row['is_admin'] == 1
@@ -199,27 +216,56 @@ def serve_static(path):
 
 @app.route("/api/register", methods=["POST"])
 def register():
-    data = request.json; conn, t = get_db_connection(); c = conn.cursor()
+    data = request.json
+    conn, t = get_db_connection()
+    c = conn.cursor()
+    
     ref_code = (data["username"][:4] + secrets.token_hex(2)).upper()
-    used_ref = data.get("referral_code", "").strip().upper(); bonus = 0
+    used_ref = data.get("referral_code", "").strip().upper()
+    bonus = 0
+    
     try:
+        # Check Referral
         if used_ref:
             q = "SELECT id FROM users WHERE referral_code=%s" if t == "postgres" else "SELECT id FROM users WHERE referral_code=?"
-            c.execute(q, (used_ref,)); referrer = c.fetchone()
+            c.execute(q, (used_ref,))
+            referrer = c.fetchone()
             if referrer:
                 u_q = "UPDATE users SET tokens = tokens + 10 WHERE id=%s" if t == "postgres" else "UPDATE users SET tokens = tokens + 10 WHERE id=?"
-                c.execute(u_q, (referrer[0] if t=="postgres" else referrer['id'],)); bonus = 10 
+                c.execute(u_q, (referrer['id'] if isinstance(referrer, dict) else referrer[0],))
+                bonus = 10 
+
+        # Insert User
         q = "INSERT INTO users(username, email, password, tokens, last_reset, is_admin, plan, referral_code, referred_by) VALUES (%s, %s, %s, %s, %s, 0, 'Free', %s, %s)" if t == "postgres" else "INSERT INTO users(username, email, password, tokens, last_reset, is_admin, plan, referral_code, referred_by) VALUES (?, ?, ?, ?, ?, 0, 'Free', ?, ?)"
-        c.execute(q, (data["username"].lower(), data.get("email",""), generate_password_hash(data["password"]), 15+bonus, datetime.now(), ref_code, used_ref if bonus>0 else None))
-        conn.commit(); return jsonify({"message": f"Registered! {'+10 Credits' if bonus else ''}"}), 201
-    except: return jsonify({"message": "Username taken"}), 409
+        c.execute(q, (
+            data["username"].lower(), 
+            data.get("email",""), 
+            generate_password_hash(data["password"]), 
+            15 + bonus,
+            datetime.now(),
+            ref_code,
+            used_ref if bonus > 0 else None
+        ))
+        conn.commit()
+        return jsonify({"message": f"Registered! {'You got +10 credits!' if bonus else ''}"}), 201
+    except Exception as e:
+        # DEBUG LOGGING FOR ERRORS
+        print(f"❌ REGISTRATION ERROR: {e}") 
+        # Return generic error to user but we see logs
+        if "UNIQUE constraint" in str(e) or "duplicate key" in str(e):
+            return jsonify({"message": "Username taken"}), 409
+        return jsonify({"message": "Server Error during registration"}), 500
     finally: conn.close()
 
 @app.route("/api/login", methods=["POST"])
 def login():
-    data = request.json; conn, t = get_db_connection(); c = conn.cursor()
+    data = request.json
+    conn, t = get_db_connection()
+    c = conn.cursor()
     q = "SELECT id, password FROM users WHERE username=%s" if t == "postgres" else "SELECT id, password FROM users WHERE username=?"
-    c.execute(q, (data["username"].lower(),)); user = c.fetchone(); conn.close()
+    c.execute(q, (data["username"].lower(),))
+    user = c.fetchone()
+    conn.close()
     if user and check_password_hash(user['password'], data["password"]):
         token = jwt.encode({'user_id': user['id'], 'exp': datetime.utcnow() + timedelta(hours=24)}, app.config['SECRET_KEY'], algorithm="HS256")
         return jsonify({"message": "Login success", "token": token}), 200
