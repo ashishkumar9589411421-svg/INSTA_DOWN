@@ -127,6 +127,16 @@
                     </table>
                 </div>
             </div>
+
+            <div class="card" style="grid-column: 1 / -1;">
+                <h3><i class="fas fa-envelope"></i> User Messages <button class="btn btn-primary" style="font-size:0.8rem; margin-left:auto" onclick="fetchMessages()">Refresh</button></h3>
+                <div style="max-height: 300px; overflow-y: auto;">
+                    <table id="msgTable">
+                        <thead><tr><th>Name</th><th>Email</th><th>Message</th><th>Time</th><th>Action</th></tr></thead>
+                        <tbody id="msgBody"></tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -143,7 +153,7 @@
         if(!token) location.href='index.html';
 
         async function init() {
-            await Promise.all([fetchUsers(), fetchRequests(), fetchSettings(), fetchBans()]);
+            await Promise.all([fetchUsers(), fetchRequests(), fetchSettings(), fetchBans(), fetchMessages()]);
         }
 
         async function fetchSettings() {
@@ -287,6 +297,39 @@
         async function handleReq(id, action) {
             await fetch(`${API}/approve`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`}, body:JSON.stringify({request_id:id, action})});
             fetchRequests(); fetchUsers();
+        }
+
+        // MESSAGES LOGIC (NEW)
+        async function fetchMessages() {
+            try {
+                const res = await fetch(`${API}/messages`, { headers: {'Authorization': `Bearer ${token}`} });
+                const data = await res.json();
+                
+                const tbody = document.getElementById('msgBody');
+                if(data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#555">No messages yet</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = data.map(m => `
+                    <tr>
+                        <td style="font-weight:bold; color:white">${m.name || 'Anon'}</td>
+                        <td style="color:var(--primary)">${m.email || 'No Email'}</td>
+                        <td style="color:#aaa; max-width:300px; white-space:pre-wrap;">${m.message}</td>
+                        <td style="font-size:0.8rem">${new Date(m.timestamp).toLocaleDateString()}</td>
+                        <td>
+                            <button class="btn btn-danger" onclick="deleteMessage(${m.id})"><i class="fas fa-trash"></i></button>
+                            <a href="mailto:${m.email}" class="btn btn-primary" style="text-decoration:none; display:inline-block"><i class="fas fa-reply"></i></a>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch(e) { console.log("Error fetching messages"); }
+        }
+
+        async function deleteMessage(id) {
+            if(!confirm("Delete this message?")) return;
+            await fetch(`${API}/message/${id}`, { method:'DELETE', headers: {'Authorization': `Bearer ${token}`} });
+            fetchMessages();
         }
 
         // FIX: SECURE IMAGE PREVIEW
