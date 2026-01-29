@@ -437,8 +437,10 @@ def get_video_formats(url):
 def process_download(job_id, url, fmt_id):
     with download_semaphore:
         job_status[job_id]["status"] = "downloading"
+        
         def progress_hook(d):
             if d["status"] == "downloading":
+                # Clean up percentage string to avoid errors
                 raw_percent = d.get("_percent_str", "0%")
                 clean_percent = re.sub(r'\x1b\[[0-9;]*m', '', raw_percent).strip()
                 job_status[job_id].update({"percent": clean_percent.replace("%",""), "speed": d.get("_speed_str", "N/A")})
@@ -447,38 +449,66 @@ def process_download(job_id, url, fmt_id):
             "outtmpl": os.path.join(DOWNLOAD_FOLDER, f"{job_id}_%(title)s.%(ext)s"),
             "progress_hooks": [progress_hook],
             "quiet": True,
-            "concurrent_fragment_downloads": 5,
-            "buffersize": 1024,
-            "http_headers": { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" }
+            
+            # --- 🚀 SPEED OPTIMIZATION SETTINGS ---
+            "format": "best", # Avoid merging if possible (merging takes CPU time)
+            "concurrent_fragment_downloads": 10, # Download 10 parts at once (Faster on Cloud)
+            "buffersize": 1024 * 1024, # Larger buffer (1MB) for stable speed
+            "http_headers": { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
+            
+            # Use aria2c if available (optional, but faster external downloader)
+            # "external_downloader": "aria2c", 
+            # "external_downloader_args": ["-x", "16", "-k", "1M"]
         }
         
+        # Cookie Check
         if os.path.exists(COOKIE_FILE):
             ydl_opts['cookiefile'] = COOKIE_FILE
 
         if FFMPEG_PATH: ydl_opts["ffmpeg_location"] = FFMPEG_PATH
 
+        # --- OPTIMIZED FORMAT SELECTION ---
+        # If user wants MP3, we MUST use FFmpeg (CPU intensive but necessary)
         if "mp3" in fmt_id:
             ydl_opts["format"] = "bestaudio/best"
             if FFMPEG_PATH:
-                ydl_opts["postprocessors"] = [{"key": "FFmpegExtractAudio","preferredcodec": "mp3"}]
-        elif fmt_id == "best": ydl_opts["format"] = "best"
+                ydl_opts["postprocessors"] = [{
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": "128"
+                }]
+        
+        # If user wants Video, try to avoid "merging" video+audio if a single file exists
+        elif fmt_id == "best": 
+            ydl_opts["format"] = "best" # 'best' usually gets a single pre-merged file (Fastest)
+        
         elif "video" in fmt_id:
             height = fmt_id.replace("video-", "")
-            ydl_opts["format"] = f"bestvideo[height<={height}]+bestaudio/best[height<={height}]" if FFMPEG_PATH else f"best[height<={height}]"
-            if FFMPEG_PATH: ydl_opts["merge_output_format"] = "mp4"
+            # Try to find a single file with that height first to avoid FFmpeg merge
+            if FFMPEG_PATH:
+                ydl_opts["format"] = f"best[height<={height}]/bestvideo[height<={height}]+bestaudio/best[height<={height}]"
+                ydl_opts["merge_output_format"] = "mp4"
+            else:
+                 ydl_opts["format"] = f"best[height<={height}]"
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.extract_info(url, download=True)
+                # Find the file that was just created
                 for f in os.listdir(DOWNLOAD_FOLDER):
                     if f.startswith(job_id):
-                        job_status[job_id].update({"status": "completed", "file": os.path.join(DOWNLOAD_FOLDER, f), "filename": f})
+                        job_status[job_id].update({
+                            "status": "completed", 
+                            "file": os.path.join(DOWNLOAD_FOLDER, f), 
+                            "filename": f
+                        })
                         return
-                raise Exception("File missing")
+                raise Exception("File missing after download")
         except Exception as e:
             print(f"❌ DOWNLOAD ERROR: {e}")
             job_status[job_id].update({"status": "error", "error": str(e)})
 
+            
 @app.route("/api/info", methods=["POST"])
 def api_info(): 
     res = get_video_formats(request.json.get("url"))
