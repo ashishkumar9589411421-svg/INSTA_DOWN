@@ -7,85 +7,65 @@ import uuid
 import time
 import threading
 import re
-import sqlite3
+import psycopg2
+from psycopg2.extras import RealDictCursor
 import jwt 
 import secrets
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
-import psycopg2
-from psycopg2.extras import RealDictCursor
 
-# SETUP: Serve static files from the current directory
+# -------------------------
+# CONFIGURATION
+# -------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__, static_folder=BASE_DIR, static_url_path='')
 CORS(app)
 
-# -------------------------
-# SECURITY FIX: PERSISTENT SECRET KEY
-# -------------------------
+# Secrets & Cookies
 SECRET_FILE = os.path.join(BASE_DIR, "secret.key")
 COOKIE_FILE = os.path.join(BASE_DIR, "cookies.txt")
 
 def get_secret_key():
-    if os.environ.get('SECRET_KEY'):
-        return os.environ.get('SECRET_KEY')
+    if os.environ.get('SECRET_KEY'): return os.environ.get('SECRET_KEY')
     if os.path.exists(SECRET_FILE):
-        try:
-            with open(SECRET_FILE, 'r') as f:
-                return f.read().strip()
+        try: 
+            with open(SECRET_FILE, 'r') as f: return f.read().strip()
         except: pass
-    key = secrets.token_hex(32)
-    try:
-        with open(SECRET_FILE, 'w') as f:
-            f.write(key)
-    except: pass 
-    return key
+    return secrets.token_hex(32)
 
 app.config['SECRET_KEY'] = get_secret_key()
 
-# -------------------------
-# SETUP & CONFIG
-# -------------------------
+# Folders
 DOWNLOAD_FOLDER = os.path.join(BASE_DIR, "downloads")
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
-
-# --- FIXED FFMPEG DETECTION ---
-if os.path.exists(os.path.join(BASE_DIR, "ffmpeg.exe")):
-    FFMPEG_PATH = os.path.join(BASE_DIR, "ffmpeg.exe") 
-elif os.path.exists(os.path.join(BASE_DIR, "ffmpeg")):
-    FFMPEG_PATH = os.path.join(BASE_DIR, "ffmpeg") 
-elif shutil.which("ffmpeg"):
-    FFMPEG_PATH = shutil.which("ffmpeg") 
-else:
-    FFMPEG_PATH = None 
-
-# Database Path (for SQLite fallback)
-DB_PATH = os.environ.get('DB_PATH', os.path.join(BASE_DIR, "users.db"))
-
 for folder in [DOWNLOAD_FOLDER, UPLOAD_FOLDER]:
-    if not os.path.exists(folder):
-        os.makedirs(folder, exist_ok=True)
+    os.makedirs(folder, exist_ok=True)
 
-print(f"🚀 System Check: FFmpeg Path: {FFMPEG_PATH or '❌ MISSING'}")
+# FFmpeg Check
+if os.path.exists(os.path.join(BASE_DIR, "ffmpeg.exe")): FFMPEG_PATH = os.path.join(BASE_DIR, "ffmpeg.exe") 
+elif os.path.exists(os.path.join(BASE_DIR, "ffmpeg")): FFMPEG_PATH = os.path.join(BASE_DIR, "ffmpeg") 
+elif shutil.which("ffmpeg"): FFMPEG_PATH = shutil.which("ffmpeg") 
+else: FFMPEG_PATH = None 
 
+# Threading
 MAX_CONCURRENT_DOWNLOADS = int(os.environ.get('MAX_WORKERS', 2))
 executor = ThreadPoolExecutor(max_workers=MAX_CONCURRENT_DOWNLOADS) 
 download_semaphore = threading.BoundedSemaphore(MAX_CONCURRENT_DOWNLOADS)
 job_status = {}
 
 # -------------------------
-# DATABASE SETUP (POSTGRES + SQLITE FALLBACK)
+# POSTGRESQL DATABASE ENGINE
 # -------------------------
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
 def get_db_connection():
     if not DATABASE_URL:
-        conn = sqlite3.connect(DB_PATH, timeout=10)
+        import sqlite3
+        conn = sqlite3.connect("users.db", timeout=10)
         conn.row_factory = sqlite3.Row
         return conn, "sqlite"
-    
     conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
     return conn, "postgres"
 
@@ -94,7 +74,6 @@ def init_db():
     c = conn.cursor()
     
     if db_type == "postgres":
-        # Postgres Syntax
         c.execute("""CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username TEXT UNIQUE, email TEXT, password TEXT, tokens INTEGER DEFAULT 15, last_reset TIMESTAMP, is_admin INTEGER DEFAULT 0, plan TEXT DEFAULT 'Free', referral_code TEXT UNIQUE, referred_by TEXT)""")
         c.execute("""CREATE TABLE IF NOT EXISTS guests (ip TEXT PRIMARY KEY, tokens INTEGER DEFAULT 5, last_reset TIMESTAMP)""")
         c.execute("""CREATE TABLE IF NOT EXISTS payment_requests (id SERIAL PRIMARY KEY, user_id INTEGER, username TEXT, plan_name TEXT, screenshot_path TEXT, status TEXT DEFAULT 'pending', timestamp TIMESTAMP)""")
@@ -103,7 +82,6 @@ def init_db():
         c.execute("""CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, name TEXT, email TEXT, message TEXT, timestamp TIMESTAMP)""")
         conn.commit()
         
-        # Create Admin
         c.execute("SELECT * FROM users WHERE username=%s", ('ashishadmin',))
         if not c.fetchone():
             hashed = generate_password_hash("anu9936")
@@ -111,9 +89,7 @@ def init_db():
                       ('ashishadmin', hashed, datetime.now()))
             print("👑 Admin created in Postgres")
             conn.commit()
-
     else:
-        # SQLite Syntax
         c.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, email TEXT, password TEXT, tokens INTEGER DEFAULT 15, last_reset DATETIME, is_admin INTEGER DEFAULT 0, plan TEXT DEFAULT 'Free', referral_code TEXT UNIQUE, referred_by TEXT)")
         c.execute("CREATE TABLE IF NOT EXISTS guests (ip TEXT PRIMARY KEY, tokens INTEGER DEFAULT 5, last_reset DATETIME)")
         c.execute("CREATE TABLE IF NOT EXISTS payment_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, username TEXT, plan_name TEXT, screenshot_path TEXT, status TEXT DEFAULT 'pending', timestamp DATETIME)")
@@ -121,14 +97,12 @@ def init_db():
         c.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
         c.execute("CREATE TABLE IF NOT EXISTS banned_ips (ip TEXT PRIMARY KEY, reason TEXT, timestamp DATETIME)")
         
-        # Admin
         c.execute("SELECT * FROM users WHERE username='ashishadmin'")
         if not c.fetchone():
             hashed = generate_password_hash("anu9936")
             c.execute("INSERT INTO users (username, password, tokens, last_reset, is_admin, plan) VALUES (?, ?, 999999, ?, 1, 'God Mode')", 
                       ('ashishadmin', hashed, datetime.now()))
         conn.commit()
-
     conn.close()
 
 init_db()
@@ -149,7 +123,6 @@ def check_tokens(ip, user_id=None):
     conn, t = get_db_connection()
     c = conn.cursor()
     now = datetime.now()
-    
     if user_id:
         q = "SELECT tokens, last_reset, plan FROM users WHERE id=%s" if t == "postgres" else "SELECT tokens, last_reset, plan FROM users WHERE id=?"
         c.execute(q, (user_id,))
@@ -175,7 +148,6 @@ def check_tokens(ip, user_id=None):
     if tokens < 15 and (now - last_reset > timedelta(hours=12)):
         uq = "UPDATE users SET tokens=15, last_reset=%s WHERE id=%s" if t == "postgres" and user_id else "UPDATE users SET tokens=15, last_reset=? WHERE id=?"
         gq = "UPDATE guests SET tokens=5, last_reset=%s WHERE ip=%s" if t == "postgres" and not user_id else "UPDATE guests SET tokens=5, last_reset=? WHERE ip=?"
-        
         if user_id: c.execute(uq, (now, user_id))
         else: c.execute(gq, (now, ip))
         conn.commit()
@@ -231,7 +203,6 @@ def register():
     data = request.json
     conn, t = get_db_connection()
     c = conn.cursor()
-    
     ref_code = (data["username"][:4] + secrets.token_hex(2)).upper()
     used_ref = data.get("referral_code", "").strip().upper()
     bonus = 0
@@ -244,19 +215,10 @@ def register():
                 u_q = "UPDATE users SET tokens = tokens + 10 WHERE id=%s" if t == "postgres" else "UPDATE users SET tokens = tokens + 10 WHERE id=?"
                 c.execute(u_q, (referrer[0] if t=="postgres" else referrer['id'],))
                 bonus = 10 
-
         q = "INSERT INTO users(username, email, password, tokens, last_reset, is_admin, plan, referral_code, referred_by) VALUES (%s, %s, %s, %s, %s, 0, 'Free', %s, %s)" if t == "postgres" else "INSERT INTO users(username, email, password, tokens, last_reset, is_admin, plan, referral_code, referred_by) VALUES (?, ?, ?, ?, ?, 0, 'Free', ?, ?)"
-        c.execute(q, (
-            data["username"].lower(), 
-            data.get("email",""), 
-            generate_password_hash(data["password"]), 
-            15 + bonus,
-            datetime.now(),
-            ref_code,
-            used_ref if bonus > 0 else None
-        ))
+        c.execute(q, (data["username"].lower(), data.get("email",""), generate_password_hash(data["password"]), 15+bonus, datetime.now(), ref_code, used_ref if bonus>0 else None))
         conn.commit()
-        return jsonify({"message": f"Registered! {'You got +10 credits!' if bonus else ''}"}), 201
+        return jsonify({"message": f"Registered! {'+10 Credits' if bonus else ''}"}), 201
     except: return jsonify({"message": "Username taken"}), 409
     finally: conn.close()
 
@@ -295,10 +257,7 @@ def get_status():
         if row: username, is_admin, plan = row['username'], (row['is_admin'] == 1), row['plan']
     conn.close()
     tokens, _ = check_tokens(request.remote_addr, user_id)
-    return jsonify({
-        "tokens": tokens, "is_logged_in": user_id is not None, "is_admin": is_admin, "username": username, "plan": plan,
-        "maintenance": maintenance == 'true', "announcement": announcement
-    })
+    return jsonify({"tokens": tokens, "is_logged_in": user_id is not None, "is_admin": is_admin, "username": username, "plan": plan, "maintenance": maintenance == 'true', "announcement": announcement})
 
 @app.route("/api/payment/request", methods=["POST"])
 def pay_req():
@@ -308,11 +267,9 @@ def pay_req():
     if file:
         filename = secure_filename(f"{user_id}_{int(time.time())}_{file.filename}")
         file.save(os.path.join(UPLOAD_FOLDER, filename))
-        conn, t = get_db_connection()
-        c = conn.cursor()
+        conn, t = get_db_connection(); c = conn.cursor()
         uq = "SELECT username FROM users WHERE id=%s" if t == "postgres" else "SELECT username FROM users WHERE id=?"
-        c.execute(uq, (user_id,))
-        u = c.fetchone()['username']
+        c.execute(uq, (user_id,)); u = c.fetchone()['username']
         iq = "INSERT INTO payment_requests (user_id, username, plan_name, screenshot_path, status, timestamp) VALUES (%s, %s, %s, %s, 'pending', %s)" if t == "postgres" else "INSERT INTO payment_requests (user_id, username, plan_name, screenshot_path, status, timestamp) VALUES (?, ?, ?, ?, 'pending', ?)"
         c.execute(iq, (user_id, u, request.form.get("plan_name"), filename, datetime.now()))
         conn.commit(); conn.close()
@@ -340,8 +297,7 @@ def contact_submit():
 @app.route("/api/admin/settings", methods=["GET", "POST"])
 def manage_settings():
     if not is_admin_request(request): return jsonify({"error": "Unauthorized"}), 403
-    conn, t = get_db_connection()
-    c = conn.cursor()
+    conn, t = get_db_connection(); c = conn.cursor()
     if request.method == "POST":
         data = request.json
         if t == "postgres":
@@ -360,13 +316,10 @@ def manage_settings():
 @app.route("/api/admin/ban", methods=["GET", "POST", "DELETE"])
 def manage_bans():
     if not is_admin_request(request): return jsonify({"error": "Unauthorized"}), 403
-    conn, t = get_db_connection()
-    c = conn.cursor()
+    conn, t = get_db_connection(); c = conn.cursor()
     if request.method == "GET":
-        c.execute("SELECT * FROM banned_ips")
-        bans = [dict(row) for row in c.fetchall()]
-        conn.close()
-        return jsonify(bans)
+        c.execute("SELECT * FROM banned_ips"); bans = [dict(row) for row in c.fetchall()]
+        conn.close(); return jsonify(bans)
     if request.method == "POST":
         ip = request.json.get("ip")
         if ip:
@@ -376,10 +329,8 @@ def manage_bans():
     if request.method == "DELETE":
         ip = request.json.get("ip")
         q = "DELETE FROM banned_ips WHERE ip=%s" if t == "postgres" else "DELETE FROM banned_ips WHERE ip=?"
-        c.execute(q, (ip,))
-        conn.commit()
-    conn.close()
-    return jsonify({"message": "Updated"})
+        c.execute(q, (ip,)); conn.commit()
+    conn.close(); return jsonify({"message": "Updated"})
 
 @app.route("/api/admin/requests", methods=["GET"])
 def get_requests():
@@ -465,7 +416,7 @@ def delete_message(msg_id):
     return jsonify({"message": "Deleted"})
 
 # -------------------------
-# DOWNLOADER LOGIC (FIXED: ANDROID MODE ENABLED)
+# DOWNLOADER LOGIC (FIXED: iOS SPOOFING MODE)
 # -------------------------
 def format_bytes(size):
     if not size: return "N/A"
@@ -480,18 +431,21 @@ def safe_float(val):
     except: return 0.0
 
 def get_video_formats(url):
-    # ANDROID SPOOFING CONFIGURATION (FIXES RATE LIMIT)
+    # iOS SPOOFING CONFIGURATION (STRONGER RATE LIMIT BYPASS)
+    # We pretend to be an iPhone, which Instagram trusts more than a browser
     ydl_opts = { 
         "quiet": True, 
         "no_warnings": True, 
         "noplaylist": True, 
         "extract_flat": "in_playlist",
-        # THIS IS THE CRITICAL FIX: Pretend to be Android App
         "extractor_args": {
             "instagram": {
-                "platform": ["android"],
-                "imp_user_agent": ["android"]
+                "platform": ["ios"],
+                "imp_user_agent": ["ios"]
             }
+        },
+        "http_headers": {
+            "User-Agent": "Instagram 275.0.0.27.130 (iPhone14,3; iOS 16_4; en_US; en-US; scale=3.00; 1284x2778; 463999926)"
         },
         "cookiefile": COOKIE_FILE if os.path.exists(COOKIE_FILE) else None,
         "ffmpeg_location": FFMPEG_PATH
@@ -537,7 +491,7 @@ def process_download(job_id, url, fmt_id):
                 clean_percent = re.sub(r'\x1b\[[0-9;]*m', '', raw_percent).strip()
                 job_status[job_id].update({"percent": clean_percent.replace("%",""), "speed": d.get("_speed_str", "N/A")})
 
-        # ANDROID SPOOFING CONFIGURATION HERE TOO
+        # iOS SPOOFING CONFIGURATION HERE TOO
         ydl_opts = {
             "outtmpl": os.path.join(DOWNLOAD_FOLDER, f"{job_id}_%(title)s.%(ext)s"),
             "progress_hooks": [progress_hook],
@@ -546,9 +500,12 @@ def process_download(job_id, url, fmt_id):
             "buffersize": 1024 * 1024,
             "extractor_args": {
                 "instagram": {
-                    "platform": ["android"],
-                    "imp_user_agent": ["android"]
+                    "platform": ["ios"],
+                    "imp_user_agent": ["ios"]
                 }
+            },
+            "http_headers": {
+                "User-Agent": "Instagram 275.0.0.27.130 (iPhone14,3; iOS 16_4; en_US; en-US; scale=3.00; 1284x2778; 463999926)"
             },
             "cookiefile": COOKIE_FILE if os.path.exists(COOKIE_FILE) else None,
             "ffmpeg_location": FFMPEG_PATH
