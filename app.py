@@ -319,7 +319,7 @@ def serve_up(filename):
     return send_from_directory(UPLOAD_FOLDER, filename)
 
 # -------------------------
-# CONTACT FORM ROUTES (NEW)
+# CONTACT FORM ROUTES
 # -------------------------
 @app.route("/api/contact", methods=["POST"])
 def contact_submit():
@@ -496,52 +496,8 @@ def admin_reset_pass():
     return jsonify({"message": "Reset"})
 
 # -------------------------
-# DOWNLOADER LOGIC (OPTIMIZED)
+# DOWNLOADER LOGIC (ANDROID MODE FIXED)
 # -------------------------
-def process_download(job_id, url, fmt_id):
-    with download_semaphore:
-        job_status[job_id]["status"] = "downloading"
-        def progress_hook(d):
-            if d["status"] == "downloading":
-                raw_percent = d.get("_percent_str", "0%")
-                clean_percent = re.sub(r'\x1b\[[0-9;]*m', '', raw_percent).strip()
-                job_status[job_id].update({"percent": clean_percent.replace("%",""), "speed": d.get("_speed_str", "N/A")})
-
-        ydl_opts = {
-            "outtmpl": os.path.join(DOWNLOAD_FOLDER, f"{job_id}_%(title)s.%(ext)s"),
-            "progress_hooks": [progress_hook],
-            "quiet": True,
-            "concurrent_fragment_downloads": 10,
-            "buffersize": 1024 * 1024,
-            "http_headers": { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" }
-        }
-        
-        if os.path.exists(COOKIE_FILE): ydl_opts['cookiefile'] = COOKIE_FILE
-        if FFMPEG_PATH: ydl_opts["ffmpeg_location"] = FFMPEG_PATH
-
-        if "mp3" in fmt_id:
-            ydl_opts["format"] = "bestaudio/best"
-            if FFMPEG_PATH: ydl_opts["postprocessors"] = [{"key": "FFmpegExtractAudio","preferredcodec": "mp3"}]
-        elif fmt_id == "best": ydl_opts["format"] = "best"
-        elif "video" in fmt_id:
-            height = fmt_id.replace("video-", "")
-            if FFMPEG_PATH:
-                ydl_opts["format"] = f"best[height<={height}]/bestvideo[height<={height}]+bestaudio/best[height<={height}]"
-                ydl_opts["merge_output_format"] = "mp4"
-            else: ydl_opts["format"] = f"best[height<={height}]"
-
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.extract_info(url, download=True)
-                for f in os.listdir(DOWNLOAD_FOLDER):
-                    if f.startswith(job_id):
-                        job_status[job_id].update({"status": "completed", "file": os.path.join(DOWNLOAD_FOLDER, f), "filename": f})
-                        return
-                raise Exception("File missing")
-        except Exception as e:
-            job_status[job_id].update({"status": "error", "error": str(e)})
-
-# API INFO ROUTES (Keep original logic)
 def format_bytes(size):
     if not size: return "N/A"
     power = 2**10
@@ -555,12 +511,21 @@ def safe_float(val):
     except: return 0.0
 
 def get_video_formats(url):
+    # ANDROID MODE ENABLED 📱
     ydl_opts = { 
-        "quiet": True, "no_warnings": True, "noplaylist": True, "extract_flat": "in_playlist",
-        "http_headers": { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" }
+        "quiet": True, 
+        "no_warnings": True, 
+        "noplaylist": True, 
+        "extract_flat": "in_playlist",
+        "extractor_args": {
+            "instagram": {
+                "platform": ["android"],
+                "imp_user_agent": ["android"]
+            }
+        },
+        "cookiefile": COOKIE_FILE if os.path.exists(COOKIE_FILE) else None,
+        "ffmpeg_location": FFMPEG_PATH
     }
-    if os.path.exists(COOKIE_FILE): ydl_opts['cookiefile'] = COOKIE_FILE
-    if FFMPEG_PATH: ydl_opts["ffmpeg_location"] = FFMPEG_PATH
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -589,7 +554,57 @@ def get_video_formats(url):
                 formats_list.sort(key=lambda x: x.get('height', 0), reverse=True)
 
             return { "title": info.get("title", "Video"), "thumbnail": info.get("thumbnail", ""), "duration": info.get("duration_string", "N/A"), "formats": formats_list }
-    except Exception as e: return None
+    except Exception as e: 
+        print(f"Info Error: {e}")
+        return None
+
+def process_download(job_id, url, fmt_id):
+    with download_semaphore:
+        job_status[job_id]["status"] = "downloading"
+        def progress_hook(d):
+            if d["status"] == "downloading":
+                raw_percent = d.get("_percent_str", "0%")
+                clean_percent = re.sub(r'\x1b\[[0-9;]*m', '', raw_percent).strip()
+                job_status[job_id].update({"percent": clean_percent.replace("%",""), "speed": d.get("_speed_str", "N/A")})
+
+        # ANDROID MODE ENABLED 📱
+        ydl_opts = {
+            "outtmpl": os.path.join(DOWNLOAD_FOLDER, f"{job_id}_%(title)s.%(ext)s"),
+            "progress_hooks": [progress_hook],
+            "quiet": True,
+            "concurrent_fragment_downloads": 10,
+            "buffersize": 1024 * 1024,
+            "extractor_args": {
+                "instagram": {
+                    "platform": ["android"],
+                    "imp_user_agent": ["android"]
+                }
+            },
+            "cookiefile": COOKIE_FILE if os.path.exists(COOKIE_FILE) else None,
+            "ffmpeg_location": FFMPEG_PATH
+        }
+
+        if "mp3" in fmt_id:
+            ydl_opts["format"] = "bestaudio/best"
+            if FFMPEG_PATH: ydl_opts["postprocessors"] = [{"key": "FFmpegExtractAudio","preferredcodec": "mp3"}]
+        elif fmt_id == "best": ydl_opts["format"] = "best"
+        elif "video" in fmt_id:
+            height = fmt_id.replace("video-", "")
+            if FFMPEG_PATH:
+                ydl_opts["format"] = f"best[height<={height}]/bestvideo[height<={height}]+bestaudio/best[height<={height}]"
+                ydl_opts["merge_output_format"] = "mp4"
+            else: ydl_opts["format"] = f"best[height<={height}]"
+
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.extract_info(url, download=True)
+                for f in os.listdir(DOWNLOAD_FOLDER):
+                    if f.startswith(job_id):
+                        job_status[job_id].update({"status": "completed", "file": os.path.join(DOWNLOAD_FOLDER, f), "filename": f})
+                        return
+                raise Exception("File missing")
+        except Exception as e:
+            job_status[job_id].update({"status": "error", "error": str(e)})
 
 @app.route("/api/info", methods=["POST"])
 def api_info(): 
