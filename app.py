@@ -21,21 +21,21 @@ from concurrent.futures import ThreadPoolExecutor
 # -------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__, static_folder=BASE_DIR, static_url_path='')
-CORS(app)
+# Fix 405 Errors by allowing cross-origin properly
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # Secrets & Cookies
 SECRET_FILE = os.path.join(BASE_DIR, "secret.key")
 COOKIE_FILE = os.path.join(BASE_DIR, "cookies.txt")
 
-# --- DEBUG: VERIFY COOKIES ON STARTUP ---
+# --- DEBUG: VERIFY COOKIES ---
 print("------------------------------------------------")
 if os.path.exists(COOKIE_FILE):
-    print(f"✅ COOKIES FOUND at: {COOKIE_FILE}")
-    print("   (The app will use these credentials for downloads)")
+    print(f"✅ COOKIES DETECTED: {os.path.getsize(COOKIE_FILE)} bytes")
+    print("   (Using Desktop Mode to match cookies)")
 else:
-    print(f"⚠️ NO COOKIES FOUND at: {COOKIE_FILE}")
-    print("   (Downloads may fail with 'Rate-limit reached')")
-    print("   -> Please upload 'cookies.txt' to your root folder.")
+    print(f"⚠️ NO COOKIES FOUND")
+    print("   (Upload cookies.txt to fix rate limits)")
 print("------------------------------------------------")
 
 def get_secret_key():
@@ -67,19 +67,16 @@ download_semaphore = threading.BoundedSemaphore(MAX_CONCURRENT_DOWNLOADS)
 job_status = {}
 
 # -------------------------
-# POSTGRESQL DATABASE ENGINE
+# DATABASE ENGINE
 # -------------------------
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
 def get_db_connection():
-    # Fallback to SQLite if no DB URL found (for local testing)
     if not DATABASE_URL:
         import sqlite3
         conn = sqlite3.connect("users.db", timeout=10)
         conn.row_factory = sqlite3.Row
         return conn, "sqlite"
-    
-    # Connect to Render PostgreSQL
     conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
     return conn, "postgres"
 
@@ -87,44 +84,42 @@ def init_db():
     conn, db_type = get_db_connection()
     c = conn.cursor()
     
-    if db_type == "postgres":
-        # Postgres Syntax
-        c.execute("""CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username TEXT UNIQUE, email TEXT, password TEXT, tokens INTEGER DEFAULT 15, last_reset TIMESTAMP, is_admin INTEGER DEFAULT 0, plan TEXT DEFAULT 'Free', referral_code TEXT UNIQUE, referred_by TEXT)""")
-        c.execute("""CREATE TABLE IF NOT EXISTS guests (ip TEXT PRIMARY KEY, tokens INTEGER DEFAULT 5, last_reset TIMESTAMP)""")
-        c.execute("""CREATE TABLE IF NOT EXISTS payment_requests (id SERIAL PRIMARY KEY, user_id INTEGER, username TEXT, plan_name TEXT, screenshot_path TEXT, status TEXT DEFAULT 'pending', timestamp TIMESTAMP)""")
-        c.execute("""CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)""")
-        c.execute("""CREATE TABLE IF NOT EXISTS banned_ips (ip TEXT PRIMARY KEY, reason TEXT, timestamp TIMESTAMP)""")
-        c.execute("""CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, name TEXT, email TEXT, message TEXT, timestamp TIMESTAMP)""")
-        
-        conn.commit()
-        
-        # Create Admin
-        c.execute("SELECT * FROM users WHERE username=%s", ('ashishadmin',))
-        if not c.fetchone():
-            hashed = generate_password_hash("anu9936")
-            c.execute("INSERT INTO users (username, password, tokens, last_reset, is_admin, plan) VALUES (%s, %s, 999999, %s, 1, 'God Mode')", 
-                      ('ashishadmin', hashed, datetime.now()))
-            print("👑 Admin created in Postgres")
-            conn.commit()
+    # Common Schema
+    users_sql = """CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username TEXT UNIQUE, email TEXT, password TEXT, tokens INTEGER DEFAULT 15, last_reset TIMESTAMP, is_admin INTEGER DEFAULT 0, plan TEXT DEFAULT 'Free', referral_code TEXT UNIQUE, referred_by TEXT)"""
+    guests_sql = """CREATE TABLE IF NOT EXISTS guests (ip TEXT PRIMARY KEY, tokens INTEGER DEFAULT 5, last_reset TIMESTAMP)"""
+    req_sql = """CREATE TABLE IF NOT EXISTS payment_requests (id SERIAL PRIMARY KEY, user_id INTEGER, username TEXT, plan_name TEXT, screenshot_path TEXT, status TEXT DEFAULT 'pending', timestamp TIMESTAMP)"""
+    msg_sql = """CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, name TEXT, email TEXT, message TEXT, timestamp TIMESTAMP)"""
+    
+    if db_type == "sqlite":
+        # Adjust for SQLite
+        users_sql = users_sql.replace("SERIAL PRIMARY KEY", "INTEGER PRIMARY KEY AUTOINCREMENT").replace("TIMESTAMP", "DATETIME")
+        guests_sql = guests_sql.replace("TIMESTAMP", "DATETIME")
+        req_sql = req_sql.replace("SERIAL PRIMARY KEY", "INTEGER PRIMARY KEY AUTOINCREMENT").replace("TIMESTAMP", "DATETIME")
+        msg_sql = msg_sql.replace("SERIAL PRIMARY KEY", "INTEGER PRIMARY KEY AUTOINCREMENT").replace("TIMESTAMP", "DATETIME")
 
-    else:
-        # SQLite Syntax (Fallback)
-        c.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, email TEXT, password TEXT, tokens INTEGER DEFAULT 15, last_reset DATETIME, is_admin INTEGER DEFAULT 0, plan TEXT DEFAULT 'Free', referral_code TEXT UNIQUE, referred_by TEXT)")
-        c.execute("CREATE TABLE IF NOT EXISTS guests (ip TEXT PRIMARY KEY, tokens INTEGER DEFAULT 5, last_reset DATETIME)")
-        c.execute("CREATE TABLE IF NOT EXISTS payment_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, username TEXT, plan_name TEXT, screenshot_path TEXT, status TEXT DEFAULT 'pending', timestamp DATETIME)")
-        c.execute("CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT, message TEXT, timestamp DATETIME)")
+    # Execute
+    try:
+        c.execute(users_sql)
+        c.execute(guests_sql)
+        c.execute(req_sql)
+        c.execute(msg_sql)
         c.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
-        c.execute("CREATE TABLE IF NOT EXISTS banned_ips (ip TEXT PRIMARY KEY, reason TEXT, timestamp DATETIME)")
+        c.execute("CREATE TABLE IF NOT EXISTS banned_ips (ip TEXT PRIMARY KEY, reason TEXT, timestamp TIMESTAMP)".replace("TIMESTAMP", "DATETIME" if db_type=="sqlite" else "TIMESTAMP"))
         
-        # Admin
-        c.execute("SELECT * FROM users WHERE username='ashishadmin'")
+        # Admin Creation
+        user_ph = "?" if db_type == "sqlite" else "%s"
+        c.execute(f"SELECT * FROM users WHERE username={user_ph}", ('ashishadmin',))
         if not c.fetchone():
             hashed = generate_password_hash("anu9936")
-            c.execute("INSERT INTO users (username, password, tokens, last_reset, is_admin, plan) VALUES (?, ?, 999999, ?, 1, 'God Mode')", 
-                      ('ashishadmin', hashed, datetime.now()))
+            insert_sql = f"INSERT INTO users (username, password, tokens, last_reset, is_admin, plan) VALUES ({user_ph}, {user_ph}, 999999, {user_ph}, 1, 'God Mode')"
+            c.execute(insert_sql, ('ashishadmin', hashed, datetime.now()))
+            print("👑 Admin created")
+        
         conn.commit()
-
-    conn.close()
+    except Exception as e:
+        print(f"DB Init Error: {e}")
+    finally:
+        conn.close()
 
 init_db()
 
@@ -132,38 +127,26 @@ init_db()
 # HELPERS
 # -------------------------
 def is_banned(ip):
-    conn, t = get_db_connection()
-    c = conn.cursor()
+    conn, t = get_db_connection(); c = conn.cursor()
     q = "SELECT * FROM banned_ips WHERE ip=%s" if t == "postgres" else "SELECT * FROM banned_ips WHERE ip=?"
-    c.execute(q, (ip,))
-    banned = c.fetchone()
-    conn.close()
+    c.execute(q, (ip,)); banned = c.fetchone(); conn.close()
     return banned is not None
 
 def check_tokens(ip, user_id=None):
-    conn, t = get_db_connection()
-    c = conn.cursor()
-    now = datetime.now()
-    
+    conn, t = get_db_connection(); c = conn.cursor(); now = datetime.now()
     if user_id:
         q = "SELECT tokens, last_reset, plan FROM users WHERE id=%s" if t == "postgres" else "SELECT tokens, last_reset, plan FROM users WHERE id=?"
-        c.execute(q, (user_id,))
-        row = c.fetchone()
+        c.execute(q, (user_id,)); row = c.fetchone()
         if not row: return 0, False
         tokens, last_reset, plan = row['tokens'], row['last_reset'], row['plan']
     else:
         q = "SELECT tokens, last_reset FROM guests WHERE ip=%s" if t == "postgres" else "SELECT tokens, last_reset FROM guests WHERE ip=?"
-        c.execute(q, (ip,))
-        row = c.fetchone()
+        c.execute(q, (ip,)); row = c.fetchone()
         if not row:
             iq = "INSERT INTO guests (ip, tokens, last_reset) VALUES (%s, 5, %s)" if t == "postgres" else "INSERT INTO guests (ip, tokens, last_reset) VALUES (?, 5, ?)"
-            c.execute(iq, (ip, now))
-            conn.commit()
-            return 5, False
-        tokens, last_reset = row['tokens'], row['last_reset']
-        plan = "Guest"
+            c.execute(iq, (ip, now)); conn.commit(); return 5, False
+        tokens, last_reset = row['tokens'], row['last_reset']; plan = "Guest"
 
-    # Handle Datetime (Postgres returns object, SQLite returns string)
     if isinstance(last_reset, str):
         try: last_reset = datetime.strptime(last_reset.split('.')[0], "%Y-%m-%d %H:%M:%S")
         except: last_reset = datetime.min
@@ -171,27 +154,22 @@ def check_tokens(ip, user_id=None):
     if tokens < 15 and (now - last_reset > timedelta(hours=12)):
         uq = "UPDATE users SET tokens=15, last_reset=%s WHERE id=%s" if t == "postgres" and user_id else "UPDATE users SET tokens=15, last_reset=? WHERE id=?"
         gq = "UPDATE guests SET tokens=5, last_reset=%s WHERE ip=%s" if t == "postgres" and not user_id else "UPDATE guests SET tokens=5, last_reset=? WHERE ip=?"
-        
         if user_id: c.execute(uq, (now, user_id))
         else: c.execute(gq, (now, ip))
-        conn.commit()
-        tokens = 15 if user_id else 5
+        conn.commit(); tokens = 15 if user_id else 5
         
     if plan == "God Mode": tokens = 999999
-    conn.close()
-    return tokens, False
+    conn.close(); return tokens, False
 
 def consume_token(ip, user_id=None):
-    conn, t = get_db_connection()
-    c = conn.cursor()
+    conn, t = get_db_connection(); c = conn.cursor()
     if user_id:
         q = "UPDATE users SET tokens = tokens - 1 WHERE id=%s" if t == "postgres" else "UPDATE users SET tokens = tokens - 1 WHERE id=?"
         c.execute(q, (user_id,))
     else:
         q = "UPDATE guests SET tokens = tokens - 1 WHERE ip=%s" if t == "postgres" else "UPDATE guests SET tokens = tokens - 1 WHERE ip=?"
         c.execute(q, (ip,))
-    conn.commit()
-    conn.close()
+    conn.commit(); conn.close()
 
 def get_user_from_token(request):
     try:
@@ -203,12 +181,9 @@ def get_user_from_token(request):
 def is_admin_request(request):
     user_id = get_user_from_token(request)
     if not user_id: return False
-    conn, t = get_db_connection()
-    c = conn.cursor()
+    conn, t = get_db_connection(); c = conn.cursor()
     q = "SELECT is_admin FROM users WHERE id=%s" if t == "postgres" else "SELECT is_admin FROM users WHERE id=?"
-    c.execute(q, (user_id,))
-    row = c.fetchone()
-    conn.close()
+    c.execute(q, (user_id,)); row = c.fetchone(); conn.close()
     return row and row['is_admin'] == 1
 
 # -------------------------
@@ -224,49 +199,27 @@ def serve_static(path):
 
 @app.route("/api/register", methods=["POST"])
 def register():
-    data = request.json
-    conn, t = get_db_connection()
-    c = conn.cursor()
-    
-    # Generate unique referral code
+    data = request.json; conn, t = get_db_connection(); c = conn.cursor()
     ref_code = (data["username"][:4] + secrets.token_hex(2)).upper()
-    used_ref = data.get("referral_code", "").strip().upper()
-    bonus = 0
-    
+    used_ref = data.get("referral_code", "").strip().upper(); bonus = 0
     try:
         if used_ref:
             q = "SELECT id FROM users WHERE referral_code=%s" if t == "postgres" else "SELECT id FROM users WHERE referral_code=?"
-            c.execute(q, (used_ref,))
-            referrer = c.fetchone()
+            c.execute(q, (used_ref,)); referrer = c.fetchone()
             if referrer:
                 u_q = "UPDATE users SET tokens = tokens + 10 WHERE id=%s" if t == "postgres" else "UPDATE users SET tokens = tokens + 10 WHERE id=?"
-                c.execute(u_q, (referrer[0] if t=="postgres" else referrer['id'],))
-                bonus = 10 
-
+                c.execute(u_q, (referrer[0] if t=="postgres" else referrer['id'],)); bonus = 10 
         q = "INSERT INTO users(username, email, password, tokens, last_reset, is_admin, plan, referral_code, referred_by) VALUES (%s, %s, %s, %s, %s, 0, 'Free', %s, %s)" if t == "postgres" else "INSERT INTO users(username, email, password, tokens, last_reset, is_admin, plan, referral_code, referred_by) VALUES (?, ?, ?, ?, ?, 0, 'Free', ?, ?)"
-        c.execute(q, (
-            data["username"].lower(), 
-            data.get("email",""), 
-            generate_password_hash(data["password"]), 
-            15 + bonus,
-            datetime.now(),
-            ref_code,
-            used_ref if bonus > 0 else None
-        ))
-        conn.commit()
-        return jsonify({"message": f"Registered! {'You got +10 credits!' if bonus else ''}"}), 201
+        c.execute(q, (data["username"].lower(), data.get("email",""), generate_password_hash(data["password"]), 15+bonus, datetime.now(), ref_code, used_ref if bonus>0 else None))
+        conn.commit(); return jsonify({"message": f"Registered! {'+10 Credits' if bonus else ''}"}), 201
     except: return jsonify({"message": "Username taken"}), 409
     finally: conn.close()
 
 @app.route("/api/login", methods=["POST"])
 def login():
-    data = request.json
-    conn, t = get_db_connection()
-    c = conn.cursor()
+    data = request.json; conn, t = get_db_connection(); c = conn.cursor()
     q = "SELECT id, password FROM users WHERE username=%s" if t == "postgres" else "SELECT id, password FROM users WHERE username=?"
-    c.execute(q, (data["username"].lower(),))
-    user = c.fetchone()
-    conn.close()
+    c.execute(q, (data["username"].lower(),)); user = c.fetchone(); conn.close()
     if user and check_password_hash(user['password'], data["password"]):
         token = jwt.encode({'user_id': user['id'], 'exp': datetime.utcnow() + timedelta(hours=24)}, app.config['SECRET_KEY'], algorithm="HS256")
         return jsonify({"message": "Login success", "token": token}), 200
@@ -274,35 +227,23 @@ def login():
 
 @app.route("/api/status", methods=["GET"])
 def get_status():
-    user_id = get_user_from_token(request)
-    conn, t = get_db_connection()
-    c = conn.cursor()
-    
-    # Settings (Safe table check)
+    user_id = get_user_from_token(request); conn, t = get_db_connection(); c = conn.cursor()
     try:
         q = "SELECT value FROM settings WHERE key=%s" if t == "postgres" else "SELECT value FROM settings WHERE key=?"
-        c.execute(q, ('maintenance',))
-        m_row = c.fetchone()
-        c.execute(q, ('announcement',))
-        a_row = c.fetchone()
-    except: m_row = None; a_row = None
-
+        c.execute(q, ('maintenance',)); m_row = c.fetchone()
+        c.execute(q, ('announcement',)); a_row = c.fetchone()
+    except: m_row, a_row = None, None
     maintenance = m_row['value'] if m_row else 'false'
     announcement = a_row['value'] if a_row else ''
     
     username, is_admin, plan = "", False, "Guest"
     if user_id:
         q = "SELECT username, is_admin, plan FROM users WHERE id=%s" if t == "postgres" else "SELECT username, is_admin, plan FROM users WHERE id=?"
-        c.execute(q, (user_id,))
-        row = c.fetchone()
+        c.execute(q, (user_id,)); row = c.fetchone()
         if row: username, is_admin, plan = row['username'], (row['is_admin'] == 1), row['plan']
     conn.close()
-    
     tokens, _ = check_tokens(request.remote_addr, user_id)
-    return jsonify({
-        "tokens": tokens, "is_logged_in": user_id is not None, "is_admin": is_admin, "username": username, "plan": plan,
-        "maintenance": maintenance == 'true', "announcement": announcement
-    })
+    return jsonify({"tokens": tokens, "is_logged_in": user_id is not None, "is_admin": is_admin, "username": username, "plan": plan, "maintenance": maintenance == 'true', "announcement": announcement})
 
 @app.route("/api/payment/request", methods=["POST"])
 def pay_req():
@@ -312,17 +253,11 @@ def pay_req():
     if file:
         filename = secure_filename(f"{user_id}_{int(time.time())}_{file.filename}")
         file.save(os.path.join(UPLOAD_FOLDER, filename))
-        conn, t = get_db_connection()
-        c = conn.cursor()
-        
+        conn, t = get_db_connection(); c = conn.cursor()
         uq = "SELECT username FROM users WHERE id=%s" if t == "postgres" else "SELECT username FROM users WHERE id=?"
-        c.execute(uq, (user_id,))
-        u = c.fetchone()['username']
-        
+        c.execute(uq, (user_id,)); u = c.fetchone()['username']
         iq = "INSERT INTO payment_requests (user_id, username, plan_name, screenshot_path, status, timestamp) VALUES (%s, %s, %s, %s, 'pending', %s)" if t == "postgres" else "INSERT INTO payment_requests (user_id, username, plan_name, screenshot_path, status, timestamp) VALUES (?, ?, ?, ?, 'pending', ?)"
-        c.execute(iq, (user_id, u, request.form.get("plan_name"), filename, datetime.now()))
-        conn.commit()
-        conn.close()
+        c.execute(iq, (user_id, u, request.form.get("plan_name"), filename, datetime.now())); conn.commit(); conn.close()
         return jsonify({"message": "Submitted"})
     return jsonify({"error": "No file"}), 400
 
@@ -331,49 +266,35 @@ def serve_up(filename):
     if not is_admin_request(request): return "Unauthorized", 403
     return send_from_directory(UPLOAD_FOLDER, filename)
 
-# -------------------------
-# CONTACT FORM ROUTES
-# -------------------------
 @app.route("/api/contact", methods=["POST"])
 def contact_submit():
-    data = request.json
-    conn, t = get_db_connection()
-    c = conn.cursor()
+    data = request.json; conn, t = get_db_connection(); c = conn.cursor()
     q = "INSERT INTO messages (name, email, message, timestamp) VALUES (%s, %s, %s, %s)" if t == "postgres" else "INSERT INTO messages (name, email, message, timestamp) VALUES (?, ?, ?, ?)"
-    c.execute(q, (data.get("name"), data.get("email"), data.get("message"), datetime.now()))
-    conn.commit()
-    conn.close()
+    c.execute(q, (data.get("name"), data.get("email"), data.get("message"), datetime.now())); conn.commit(); conn.close()
     return jsonify({"message": "Message sent"})
 
+# -------------------------
+# ADMIN API 
+# -------------------------
 @app.route("/api/admin/messages", methods=["GET"])
 def get_messages():
     if not is_admin_request(request): return jsonify({"error": "Unauthorized"}), 403
-    conn, t = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT * FROM messages ORDER BY timestamp DESC")
-    rows = c.fetchall()
-    conn.close()
+    conn, t = get_db_connection(); c = conn.cursor()
+    c.execute("SELECT * FROM messages ORDER BY timestamp DESC"); rows = c.fetchall(); conn.close()
     return jsonify([dict(row) for row in rows])
 
 @app.route("/api/admin/message/<int:msg_id>", methods=["DELETE"])
 def delete_message(msg_id):
     if not is_admin_request(request): return jsonify({"error": "Unauthorized"}), 403
-    conn, t = get_db_connection()
-    c = conn.cursor()
+    conn, t = get_db_connection(); c = conn.cursor()
     q = "DELETE FROM messages WHERE id=%s" if t == "postgres" else "DELETE FROM messages WHERE id=?"
-    c.execute(q, (msg_id,))
-    conn.commit()
-    conn.close()
+    c.execute(q, (msg_id,)); conn.commit(); conn.close()
     return jsonify({"message": "Deleted"})
 
-# -------------------------
-# ADMIN API (POSTGRES COMPATIBLE)
-# -------------------------
 @app.route("/api/admin/settings", methods=["GET", "POST"])
 def manage_settings():
     if not is_admin_request(request): return jsonify({"error": "Unauthorized"}), 403
-    conn, t = get_db_connection()
-    c = conn.cursor()
+    conn, t = get_db_connection(); c = conn.cursor()
     if request.method == "POST":
         data = request.json
         if t == "postgres":
@@ -383,133 +304,96 @@ def manage_settings():
             if "maintenance" in data: c.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('maintenance', ?)", (str(data['maintenance']).lower(),))
             if "announcement" in data: c.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('announcement', ?)", (data['announcement'],))
         conn.commit()
-    
     q = "SELECT value FROM settings WHERE key=%s" if t == "postgres" else "SELECT value FROM settings WHERE key=?"
-    c.execute(q, ('maintenance',))
-    m = c.fetchone()
-    c.execute(q, ('announcement',))
-    a = c.fetchone()
+    c.execute(q, ('maintenance',)); m = c.fetchone()
+    c.execute(q, ('announcement',)); a = c.fetchone()
     conn.close()
     return jsonify({"maintenance": (m['value'] == 'true') if m else False, "announcement": a['value'] if a else ""})
 
 @app.route("/api/admin/ban", methods=["GET", "POST", "DELETE"])
 def manage_bans():
     if not is_admin_request(request): return jsonify({"error": "Unauthorized"}), 403
-    conn, t = get_db_connection()
-    c = conn.cursor()
+    conn, t = get_db_connection(); c = conn.cursor()
     if request.method == "GET":
-        c.execute("SELECT * FROM banned_ips")
-        bans = [dict(row) for row in c.fetchall()]
-        conn.close()
-        return jsonify(bans)
-    
+        c.execute("SELECT * FROM banned_ips"); bans = [dict(row) for row in c.fetchall()]; conn.close(); return jsonify(bans)
     if request.method == "POST":
         ip = request.json.get("ip")
         if ip:
             if t == "postgres": c.execute("INSERT INTO banned_ips (ip, reason, timestamp) VALUES (%s, 'Admin Ban', %s) ON CONFLICT (ip) DO UPDATE SET timestamp = EXCLUDED.timestamp", (ip, datetime.now()))
             else: c.execute("INSERT OR REPLACE INTO banned_ips (ip, reason, timestamp) VALUES (?, 'Admin Ban', ?)", (ip, datetime.now()))
         conn.commit()
-
     if request.method == "DELETE":
         ip = request.json.get("ip")
         q = "DELETE FROM banned_ips WHERE ip=%s" if t == "postgres" else "DELETE FROM banned_ips WHERE ip=?"
-        c.execute(q, (ip,))
-        conn.commit()
-    
-    conn.close()
-    return jsonify({"message": "Updated"})
+        c.execute(q, (ip,)); conn.commit()
+    conn.close(); return jsonify({"message": "Updated"})
 
 @app.route("/api/admin/requests", methods=["GET"])
 def get_requests():
     if not is_admin_request(request): return jsonify({"error": "Unauthorized"}), 403
-    conn, t = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT * FROM payment_requests WHERE status='pending' ORDER BY timestamp DESC")
-    rows = c.fetchall()
-    conn.close()
+    conn, t = get_db_connection(); c = conn.cursor()
+    c.execute("SELECT * FROM payment_requests WHERE status='pending' ORDER BY timestamp DESC"); rows = c.fetchall(); conn.close()
     return jsonify({"requests": [dict(row) for row in rows]})
 
 @app.route("/api/admin/approve", methods=["POST"])
 def approve_request():
     if not is_admin_request(request): return jsonify({"error": "Unauthorized"}), 403
-    data = request.json
-    conn, t = get_db_connection()
-    c = conn.cursor()
+    data = request.json; conn, t = get_db_connection(); c = conn.cursor()
     q = "SELECT user_id, plan_name FROM payment_requests WHERE id=%s" if t == "postgres" else "SELECT user_id, plan_name FROM payment_requests WHERE id=?"
-    c.execute(q, (data.get("request_id"),))
-    req = c.fetchone()
+    c.execute(q, (data.get("request_id"),)); req = c.fetchone()
     if not req: return jsonify({"error": "Not found"}), 404
-    
     if data.get("action") == "approve":
         tokens = 999999 if "God" in req['plan_name'] else 50
         uq = "UPDATE users SET tokens = tokens + %s, plan = %s WHERE id=%s" if t == "postgres" else "UPDATE users SET tokens = tokens + ?, plan = ? WHERE id=?"
         pq = "UPDATE payment_requests SET status='approved' WHERE id=%s" if t == "postgres" else "UPDATE payment_requests SET status='approved' WHERE id=?"
-        c.execute(uq, (tokens, req['plan_name'], req['user_id']))
-        c.execute(pq, (data.get("request_id"),))
+        c.execute(uq, (tokens, req['plan_name'], req['user_id'])); c.execute(pq, (data.get("request_id"),))
     else:
         pq = "UPDATE payment_requests SET status='rejected' WHERE id=%s" if t == "postgres" else "UPDATE payment_requests SET status='rejected' WHERE id=?"
         c.execute(pq, (data.get("request_id"),))
-    conn.commit()
-    conn.close()
-    return jsonify({"message": "Processed"})
+    conn.commit(); conn.close(); return jsonify({"message": "Processed"})
 
 @app.route("/api/admin/users", methods=["GET"])
 def get_all_users():
     if not is_admin_request(request): return jsonify({"error": "Unauthorized"}), 403
-    conn, t = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT id, username, email, tokens, is_admin, plan FROM users")
-    users = [dict(row) for row in c.fetchall()]
-    conn.close()
+    conn, t = get_db_connection(); c = conn.cursor()
+    c.execute("SELECT id, username, email, tokens, is_admin, plan FROM users"); users = [dict(row) for row in c.fetchall()]; conn.close()
     return jsonify({"users": users})
 
 @app.route("/api/admin/credits", methods=["POST"])
 def admin_add_credits():
     if not is_admin_request(request): return jsonify({"error": "Unauthorized"}), 403
-    conn, t = get_db_connection()
-    c = conn.cursor()
+    conn, t = get_db_connection(); c = conn.cursor()
     q = "UPDATE users SET tokens = tokens + %s WHERE id=%s" if t == "postgres" else "UPDATE users SET tokens = tokens + ? WHERE id=?"
-    c.execute(q, (int(request.json.get("amount",0)), request.json.get("user_id")))
-    conn.commit()
-    conn.close()
+    c.execute(q, (int(request.json.get("amount",0)), request.json.get("user_id"))); conn.commit(); conn.close()
     return jsonify({"message": "Updated"})
 
 @app.route("/api/admin/promote", methods=["POST"])
 def promote():
     if not is_admin_request(request): return jsonify({"error": "Unauthorized"}), 403
-    conn, t = get_db_connection()
-    c = conn.cursor()
+    conn, t = get_db_connection(); c = conn.cursor()
     q = "UPDATE users SET is_admin = %s WHERE id = %s" if t == "postgres" else "UPDATE users SET is_admin = ? WHERE id = ?"
-    c.execute(q, (1 if request.json.get("is_admin") else 0, request.json.get("user_id")))
-    conn.commit()
-    conn.close()
+    c.execute(q, (1 if request.json.get("is_admin") else 0, request.json.get("user_id"))); conn.commit(); conn.close()
     return jsonify({"message": "Updated"})
 
 @app.route("/api/admin/user/<int:user_id>", methods=["DELETE"])
 def delete_user(user_id):
     if not is_admin_request(request): return jsonify({"error": "Unauthorized"}), 403
-    conn, t = get_db_connection()
-    c = conn.cursor()
+    conn, t = get_db_connection(); c = conn.cursor()
     q = "DELETE FROM users WHERE id = %s" if t == "postgres" else "DELETE FROM users WHERE id = ?"
-    c.execute(q, (user_id,))
-    conn.commit()
-    conn.close()
+    c.execute(q, (user_id,)); conn.commit(); conn.close()
     return jsonify({"message": "Deleted"})
 
 @app.route("/api/admin/reset-password", methods=["POST"])
 def admin_reset_pass():
     if not is_admin_request(request): return jsonify({"error": "Unauthorized"}), 403
     hashed = generate_password_hash(request.json.get("password"))
-    conn, t = get_db_connection()
-    c = conn.cursor()
+    conn, t = get_db_connection(); c = conn.cursor()
     q = "UPDATE users SET password = %s WHERE id = %s" if t == "postgres" else "UPDATE users SET password = ? WHERE id = ?"
-    c.execute(q, (hashed, request.json.get("user_id")))
-    conn.commit()
-    conn.close()
+    c.execute(q, (hashed, request.json.get("user_id"))); conn.commit(); conn.close()
     return jsonify({"message": "Reset"})
 
 # -------------------------
-# DOWNLOADER LOGIC (ANDROID + COOKIES FIXED)
+# DOWNLOADER LOGIC (DESKTOP MODE + COOKIES)
 # -------------------------
 def format_bytes(size):
     if not size: return "N/A"
@@ -524,20 +408,15 @@ def safe_float(val):
     except: return 0.0
 
 def get_video_formats(url):
-    # ANDROID SPOOFING + COOKIES CONFIGURATION
+    # USE COOKIES + DESKTOP USER AGENT
     ydl_opts = { 
         "quiet": True, 
         "no_warnings": True, 
         "noplaylist": True, 
         "extract_flat": "in_playlist",
-        "extractor_args": {
-            "instagram": {
-                "platform": ["android"],
-                "imp_user_agent": ["android"]
-            }
+        "http_headers": { 
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" 
         },
-        # WE DO NOT USE 'http_headers' USER-AGENT HERE
-        # We let the 'extractor_args' handle the spoofing
         "cookiefile": COOKIE_FILE if os.path.exists(COOKIE_FILE) else None,
         "ffmpeg_location": FFMPEG_PATH
     }
@@ -588,11 +467,8 @@ def process_download(job_id, url, fmt_id):
             "quiet": True,
             "concurrent_fragment_downloads": 10,
             "buffersize": 1024 * 1024,
-            "extractor_args": {
-                "instagram": {
-                    "platform": ["android"],
-                    "imp_user_agent": ["android"]
-                }
+            "http_headers": { 
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" 
             },
             "cookiefile": COOKIE_FILE if os.path.exists(COOKIE_FILE) else None,
             "ffmpeg_location": FFMPEG_PATH
@@ -619,6 +495,37 @@ def process_download(job_id, url, fmt_id):
                 raise Exception("File missing")
         except Exception as e:
             job_status[job_id].update({"status": "error", "error": str(e)})
+
+@app.route("/api/info", methods=["POST", "OPTIONS"])
+def api_info(): 
+    if request.method == "OPTIONS": return jsonify({"status":"ok"}), 200
+    res = get_video_formats(request.json.get("url"))
+    return jsonify(res) if res else (jsonify({"error": "Failed"}), 400)
+
+@app.route("/api/download", methods=["POST", "OPTIONS"])
+def api_download():
+    if request.method == "OPTIONS": return jsonify({"status":"ok"}), 200
+    ip = request.remote_addr
+    if is_banned(ip): return jsonify({"error": "BANNED", "message": "IP Banned"}), 403
+    
+    conn, t = get_db_connection(); c = conn.cursor()
+    q = "SELECT value FROM settings WHERE key=%s" if t == "postgres" else "SELECT value FROM settings WHERE key=?"
+    c.execute(q, ('maintenance',)); m = c.fetchone(); conn.close()
+    if m and m['value'] == 'true' and not is_admin_request(request): return jsonify({"error": "MAINTENANCE", "message": "Under maintenance"}), 503
+
+    user_id = get_user_from_token(request)
+    tokens_left, _ = check_tokens(ip, user_id)
+
+    if tokens_left <= 0:
+        msg = "Daily limit reached (15/15)." if user_id else "Guest limit reached (5/5). Login for more!"
+        return jsonify({"error": "LIMIT_REACHED", "message": msg}), 403
+
+    consume_token(ip, user_id)
+    data = request.json
+    job_id = str(uuid.uuid4())
+    job_status[job_id] = {"status": "queued", "percent": "0"}
+    executor.submit(process_download, job_id, data.get("url"), data.get("format_id"))
+    return jsonify({"job_id": job_id})
 
 @app.route("/api/progress/<job_id>")
 def api_progress(job_id): return jsonify(job_status.get(job_id, {"status": "unknown"}))
