@@ -1,884 +1,366 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - In.dl</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root {
-            --primary: #d62976;
-            --bg-primary: #000000;
-            --bg-secondary: #0a0a0a;
-            --bg-glass: rgba(255, 255, 255, 0.03);
-            --border: rgba(255, 255, 255, 0.1);
-            --text-primary: #ffffff;
-            --text-secondary: #a0a0a0;
-            --success: #00ff88;
-            --warning: #ffb800;
-            --danger: #ff0033;
-        }
-
-        [data-theme="light"] {
-            --bg-primary: #ffffff;
-            --bg-secondary: #f5f5f5;
-            --bg-glass: rgba(0, 0, 0, 0.03);
-            --border: rgba(0, 0, 0, 0.1);
-            --text-primary: #000000;
-            --text-secondary: #555555;
-        }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        :root { --bg-deep: #050505; --primary: #d62976; --glass: rgba(20, 20, 20, 0.9); --border: rgba(255, 255, 255, 0.1); --text: #ffffff; --danger: #ff0033; --success: #00ff88; --warn: #ffaa00; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        body { background-color: var(--bg-deep); background-image: radial-gradient(circle at 50% 50%, #111 0%, #000 100%); color: var(--text); min-height: 100vh; }
+        .void-stream { position: fixed; inset: 0; z-index: -1; pointer-events: none; }
         
-        body {
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            min-height: 100vh;
-        }
+        header { padding: 20px; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 1.5rem; font-weight: 900; color: white; display: flex; gap: 10px; }
+        
+        .container { max-width: 1200px; margin: 40px auto; padding: 0 20px; }
+        
+        .grid-layout { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 40px; }
+        
+        .card { background: var(--glass); padding: 25px; border-radius: 15px; border: 1px solid var(--border); }
+        .card h3 { margin-bottom: 20px; display: flex; align-items: center; gap: 10px; font-size: 1.2rem; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+        
+        .stat-val { font-size: 2.5rem; font-weight: bold; color: var(--primary); }
+        .stat-label { color: #888; }
+        
+        .inp-group { margin-bottom: 15px; }
+        .inp-group label { display: block; margin-bottom: 5px; color: #aaa; font-size: 0.9rem; }
+        .inp { width: 100%; background: #000; border: 1px solid #333; padding: 10px; color: white; border-radius: 8px; outline: none; }
+        .inp:focus { border-color: var(--primary); }
+        
+        .btn { padding: 8px 12px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; color: white; font-size: 0.9rem; }
+        .btn-primary { background: var(--primary); }
+        .btn-danger { background: var(--danger); }
+        .btn-success { background: var(--success); color: black; }
+        .btn-warn { background: var(--warn); color: black; }
+        .btn:hover { opacity: 0.9; transform: scale(1.05); }
+        
+        /* Switch Toggle */
+        .switch { position: relative; display: inline-block; width: 50px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #333; transition: .4s; border-radius: 24px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--primary); }
+        input:checked + .slider:before { transform: translateX(26px); }
 
-        .admin-layout {
-            display: grid;
-            grid-template-columns: 280px 1fr;
-            min-height: 100vh;
-        }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #222; font-size: 0.9rem; }
+        th { color: #888; }
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; }
+        .bg-red { background: rgba(255,0,0,0.2); color: red; }
+        .bg-blue { background: rgba(0, 100, 255, 0.2); color: #4facfe; }
 
-        /* Sidebar */
-        .sidebar {
-            background: var(--bg-secondary);
-            border-right: 1px solid var(--border);
-            padding: 30px 20px;
-            position: sticky;
-            top: 0;
-            height: 100vh;
-            overflow-y: auto;
-        }
-
-        .admin-logo {
-            font-size: 1.8rem;
-            font-weight: 800;
-            background: linear-gradient(135deg, var(--primary), #fda75b);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 40px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .nav-section {
-            margin-bottom: 30px;
-        }
-
-        .nav-title {
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: var(--text-secondary);
-            margin-bottom: 15px;
-            padding-left: 15px;
-        }
-
-        .nav-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 15px;
-            border-radius: 12px;
-            cursor: pointer;
-            transition: all 0.3s;
-            color: var(--text-secondary);
-            text-decoration: none;
-            margin-bottom: 5px;
-        }
-
-        .nav-item:hover, .nav-item.active {
-            background: var(--bg-glass);
-            color: var(--text-primary);
-        }
-
-        .nav-item.active {
-            background: var(--primary);
-            color: white;
-        }
-
-        .nav-item i {
-            width: 24px;
-            text-align: center;
-        }
-
-        .badge {
-            margin-left: auto;
-            background: var(--danger);
-            color: white;
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-size: 0.75rem;
-            font-weight: 700;
-        }
-
-        /* Main Content */
-        .main-content {
-            padding: 30px;
-            overflow-y: auto;
-            max-height: 100vh;
-        }
-
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-        }
-
-        .header h1 {
-            font-size: 2rem;
-            font-weight: 800;
-        }
-
-        .header-actions {
-            display: flex;
-            gap: 10px;
-        }
-
-        .btn {
-            padding: 10px 20px;
-            border-radius: 8px;
-            border: none;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.3s;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .btn-primary { background: var(--primary); color: white; }
-        .btn-danger { background: var(--danger); color: white; }
-        .btn-secondary { background: var(--bg-glass); color: var(--text-primary); border: 1px solid var(--border); }
-
-        .btn:hover { transform: translateY(-2px); opacity: 0.9; }
-
-        /* Stats Grid */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .stat-card {
-            background: var(--bg-glass);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 25px;
-            transition: all 0.3s;
-        }
-
-        .stat-card:hover {
-            transform: translateY(-5px);
-            border-color: var(--primary);
-        }
-
-        .stat-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-
-        .stat-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 12px;
-            background: rgba(214, 41, 118, 0.1);
-            color: var(--primary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-        }
-
-        .stat-value {
-            font-size: 2.5rem;
-            font-weight: 800;
-            margin-bottom: 5px;
-        }
-
-        .stat-label {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-        }
-
-        .stat-change {
-            font-size: 0.85rem;
-            margin-top: 10px;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .stat-change.positive { color: var(--success); }
-        .stat-change.negative { color: var(--danger); }
-
-        /* Content Cards */
-        .card {
-            background: var(--bg-glass);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 25px;
-            margin-bottom: 20px;
-        }
-
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        .card-title {
-            font-size: 1.3rem;
-            font-weight: 700;
-        }
-
-        /* Tables */
-        .data-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .data-table th {
-            text-align: left;
-            padding: 12px;
-            color: var(--text-secondary);
-            font-weight: 600;
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .data-table td {
-            padding: 15px 12px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .data-table tr:hover td {
-            background: var(--bg-glass);
-        }
-
-        .user-cell {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: var(--primary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            color: white;
-        }
-
-        .plan-badge {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 600;
-        }
-
-        .plan-free { background: #333; color: #fff; }
-        .plan-booster { background: #4a90e2; color: #fff; }
-        .plan-god { background: linear-gradient(135deg, #ffd700, #ffb700); color: #000; }
-
-        .status-badge {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 600;
-        }
-
-        .status-pending { background: rgba(255, 184, 0, 0.2); color: var(--warning); }
-        .status-approved { background: rgba(0, 255, 136, 0.2); color: var(--success); }
-        .status-rejected { background: rgba(255, 0, 51, 0.2); color: var(--danger); }
-
-        /* Tabs */
-        .tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            border-bottom: 1px solid var(--border);
-            padding-bottom: 10px;
-        }
-
-        .tab {
-            padding: 10px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-weight: 600;
-            color: var(--text-secondary);
-        }
-
-        .tab:hover { color: var(--text-primary); }
-        .tab.active { background: var(--primary); color: white; }
-
-        /* Charts */
-        .chart-container {
-            position: relative;
-            height: 300px;
-            margin-top: 20px;
-        }
-
-        /* Modal */
-        .modal {
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.8);
-            backdrop-filter: blur(10px);
-            z-index: 1000;
-            display: none;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
-
-        .modal.active { display: flex; }
-
-        .modal-content {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            width: 100%;
-            max-width: 600px;
-            max-height: 90vh;
-            overflow: hidden;
-        }
-
-        .modal-header {
-            padding: 20px 25px;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .modal-body {
-            padding: 25px;
-            overflow-y: auto;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-label {
-            display: block;
-            margin-bottom: 8px;
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-        }
-
-        .form-input {
-            width: 100%;
-            padding: 12px;
-            background: var(--bg-glass);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            color: var(--text-primary);
-            font-size: 1rem;
-        }
-
-        .form-input:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-
-        @media (max-width: 768px) {
-            .admin-layout { grid-template-columns: 1fr; }
-            .sidebar { display: none; }
-        }
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-box { background: #111; padding: 30px; border-radius: 15px; border: 1px solid #333; max-width: 500px; width: 90%; position: relative; text-align: center; }
+        
+        .action-btn-group { display: flex; gap: 5px; }
     </style>
 </head>
 <body>
-    <div class="admin-layout">
-        <aside class="sidebar">
-            <div class="admin-logo">
-                <i class="fas fa-shield-alt"></i>
-                Admin Panel
+    <header>
+        <div class="logo"><i class="fab fa-instagram"></i> In.dl Admin</div>
+        <a href="index.html" style="color:#aaa; text-decoration:none">Back to App</a>
+    </header>
+
+    <div class="container">
+        
+        <div class="grid-layout">
+            <div class="card">
+                <h3><i class="fas fa-users"></i> Users</h3>
+                <div class="stat-val" id="totalUsers">0</div>
+                <div class="stat-label">Registered Accounts</div>
             </div>
+            <div class="card">
+                <h3><i class="fas fa-coins"></i> Credits</h3>
+                <div class="stat-val" id="totalCredits">0</div>
+                <div class="stat-label">Total Circulating</div>
+            </div>
+             <div class="card">
+                <h3><i class="fas fa-cogs"></i> System Control</h3>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px">
+                    <span>Maintenance Mode</span>
+                    <label class="switch"><input type="checkbox" id="maintSwitch" onchange="saveSettings()"><span class="slider"></span></label>
+                </div>
+                <div class="inp-group">
+                    <label>Global Announcement (Marquee)</label>
+                    <div style="display:flex; gap:10px">
+                        <input type="text" id="annInp" class="inp" placeholder="e.g. Server restart at 10PM">
+                        <button class="btn btn-primary" onclick="saveSettings()">Set</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-bottom:20px">
+            <h3><i class="fas fa-shield-alt"></i> Security & IP Bans</h3>
+            <div style="display:flex; gap:10px; margin-bottom:20px">
+                <input type="text" id="banIpInp" class="inp" placeholder="Enter IP Address to Ban" style="max-width:300px">
+                <button class="btn btn-danger" onclick="banIp()">Ban IP</button>
+            </div>
+            <div style="max-height:200px; overflow-y:auto">
+                <table id="banTable">
+                    <thead><tr><th>IP Address</th><th>Reason</th><th>Time</th><th>Action</th></tr></thead>
+                    <tbody id="banBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="grid-layout" style="grid-template-columns: 1fr;">
             
-            <div class="nav-section">
-                <div class="nav-title">Main</div>
-                <a href="#" class="nav-item active" onclick="showSection('dashboard')">
-                    <i class="fas fa-chart-line"></i>
-                    Dashboard
-                </a>
-                <a href="#" class="nav-item" onclick="showSection('users')">
-                    <i class="fas fa-users"></i>
-                    Users
-                    <span class="badge" id="userCountBadge">0</span>
-                </a>
-                <a href="#" class="nav-item" onclick="showSection('payments')">
-                    <i class="fas fa-credit-card"></i>
-                    Payments
-                    <span class="badge" id="paymentBadge">0</span>
-                </a>
-                <a href="#" class="nav-item" onclick="showSection('tickets')">
-                    <i class="fas fa-headset"></i>
-                    Support
-                    <span class="badge" id="ticketBadge">0</span>
-                </a>
-            </div>
-            
-            <div class="nav-section">
-                <div class="nav-title">System</div>
-                <a href="#" class="nav-item" onclick="showSection('settings')">
-                    <i class="fas fa-cog"></i>
-                    Settings
-                </a>
-                <a href="#" class="nav-item" onclick="showSection('bans')">
-                    <i class="fas fa-ban"></i>
-                    Bans
-                </a>
-                <a href="/" class="nav-item">
-                    <i class="fas fa-arrow-left"></i>
-                    Back to Site
-                </a>
-            </div>
-        </aside>
-
-        <main class="main-content">
-            <!-- Dashboard Section -->
-            <div id="dashboard-section">
-                <div class="header">
-                    <div>
-                        <h1>Dashboard</h1>
-                        <p style="color: var(--text-secondary);">Welcome back, Administrator</p>
-                    </div>
-                    <div class="header-actions">
-                        <button class="btn btn-secondary" onclick="refreshData()">
-                            <i class="fas fa-sync-alt"></i> Refresh
-                        </button>
-                    </div>
-                </div>
-
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-header">
-                            <div class="stat-icon"><i class="fas fa-users"></i></div>
-                            <span class="stat-change positive"><i class="fas fa-arrow-up"></i> 12%</span>
-                        </div>
-                        <div class="stat-value" id="totalUsers">0</div>
-                        <div class="stat-label">Total Users</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-header">
-                            <div class="stat-icon" style="background: rgba(0, 255, 136, 0.1); color: var(--success);">
-                                <i class="fas fa-download"></i>
-                            </div>
-                            <span class="stat-change positive"><i class="fas fa-arrow-up"></i> 8%</span>
-                        </div>
-                        <div class="stat-value" id="todayDownloads">0</div>
-                        <div class="stat-label">Downloads Today</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-header">
-                            <div class="stat-icon" style="background: rgba(255, 184, 0, 0.1); color: var(--warning);">
-                                <i class="fas fa-clock"></i>
-                            </div>
-                        </div>
-                        <div class="stat-value" id="pendingPayments">0</div>
-                        <div class="stat-label">Pending Payments</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-header">
-                            <div class="stat-icon" style="background: rgba(255, 0, 51, 0.1); color: var(--danger);">
-                                <i class="fas fa-exclamation-triangle"></i>
-                            </div>
-                        </div>
-                        <div class="stat-value" id="openTickets">0</div>
-                        <div class="stat-label">Open Tickets</div>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title">Download Analytics (30 Days)</h3>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="analyticsChart"></canvas>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title">Recent Users</h3>
-                    </div>
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>User</th>
-                                <th>Plan</th>
-                                <th>Credits</th>
-                                <th>Joined</th>
-                            </tr>
-                        </thead>
-                        <tbody id="recentUsersTable">
-                            <!-- Populated by JS -->
-                        </tbody>
+            <div class="card">
+                <h3><i class="fas fa-money-bill"></i> Payment Requests <button class="btn btn-primary" style="font-size:0.8rem; margin-left:auto" id="btnReq" onclick="fetchRequests()">Refresh</button></h3>
+                <div style="overflow-x:auto">
+                    <table id="reqTable">
+                        <thead><tr><th>User</th><th>Plan</th><th>Proof</th><th>Actions</th></tr></thead>
+                        <tbody id="reqBody"></tbody>
                     </table>
                 </div>
             </div>
 
-            <!-- Users Section -->
-            <div id="users-section" style="display:none;">
-                <div class="header">
-                    <h1>User Management</h1>
-                    <div class="header-actions">
-                        <input type="text" placeholder="Search users..." class="form-input" style="width:300px;" id="userSearch">
-                    </div>
-                </div>
-                
-                <div class="card">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>User</th>
-                                <th>Email</th>
-                                <th>Plan</th>
-                                <th>Credits</th>
-                                <th>Downloads</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="usersTable">
-                            <!-- Populated by JS -->
-                        </tbody>
+            <div class="card">
+                <h3><i class="fas fa-user-cog"></i> User Management <button class="btn btn-primary" style="font-size:0.8rem; margin-left:auto" id="btnUsr" onclick="fetchUsers()">Refresh</button></h3>
+                <div style="overflow-x:auto">
+                    <table id="userTable">
+                        <thead><tr><th>Username</th><th>Plan</th><th>Credits</th><th>Actions</th></tr></thead>
+                        <tbody id="userBody"></tbody>
                     </table>
                 </div>
             </div>
 
-            <!-- Payments Section -->
-            <div id="payments-section" style="display:none;">
-                <div class="header">
-                    <h1>Payment Requests</h1>
-                </div>
-                
-                <div class="tabs">
-                    <div class="tab active" onclick="loadPayments('pending')">Pending</div>
-                    <div class="tab" onclick="loadPayments('approved')">Approved</div>
-                    <div class="tab" onclick="loadPayments('rejected')">Rejected</div>
-                </div>
-                
-                <div class="card">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>User</th>
-                                <th>Plan</th>
-                                <th>Amount</th>
-                                <th>Date</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="paymentsTable">
-                            <!-- Populated by JS -->
-                        </tbody>
+            <div class="card" style="grid-column: 1 / -1;">
+                <h3><i class="fas fa-envelope"></i> User Messages <button class="btn btn-primary" style="font-size:0.8rem; margin-left:auto" onclick="fetchMessages()">Refresh</button></h3>
+                <div style="max-height: 300px; overflow-y: auto;">
+                    <table id="msgTable">
+                        <thead><tr><th>Name</th><th>Email</th><th>Message</th><th>Time</th><th>Action</th></tr></thead>
+                        <tbody id="msgBody"></tbody>
                     </table>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <!-- Settings Section -->
-            <div id="settings-section" style="display:none;">
-                <div class="header">
-                    <h1>System Settings</h1>
-                </div>
-                
-                <div class="card">
-                    <h3 class="card-title" style="margin-bottom:20px;">Site Configuration</h3>
-                    <div class="form-group">
-                        <label class="form-label">Site Name</label>
-                        <input type="text" class="form-input" id="siteName" value="In.dl">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Global Announcement</label>
-                        <input type="text" class="form-input" id="globalAnnouncement" placeholder="Enter announcement text...">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">
-                            <input type="checkbox" id="maintenanceMode"> Maintenance Mode
-                        </label>
-                    </div>
-                    <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
-                </div>
-            </div>
-        </main>
+    <div class="modal" id="proofModal" onclick="this.style.display='none'">
+        <div class="modal-box" onclick="event.stopPropagation()">
+            <img id="proofImg" src="" style="width:100%; border-radius:10px; min-height:200px; background:#222;">
+            <p id="proofLoading" style="display:none; color:#888">Loading Image...</p>
+        </div>
     </div>
 
     <script>
-        const API = '/api/admin';
-        let authToken = localStorage.getItem('indl_token');
-        let analyticsChart = null;
+        const API = "/api/admin";
+        const token = localStorage.getItem('token');
+        if(!token) location.href='index.html';
 
-        // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
-            if (!authToken) {
-                window.location.href = '/';
-                return;
-            }
-            loadDashboard();
-        });
-
-        function showSection(section) {
-            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-            event.currentTarget.classList.add('active');
-            
-            ['dashboard', 'users', 'payments', 'tickets', 'settings', 'bans'].forEach(s => {
-                const el = document.getElementById(s + '-section');
-                if (el) el.style.display = 'none';
-            });
-            
-            const target = document.getElementById(section + '-section');
-            if (target) {
-                target.style.display = 'block';
-                // Load section data
-                if (section === 'users') loadUsers();
-                if (section === 'payments') loadPayments('pending');
-                if (section === 'dashboard') loadDashboard();
-            }
+        async function init() {
+            await Promise.all([fetchUsers(), fetchRequests(), fetchSettings(), fetchBans(), fetchMessages()]);
         }
 
-        async function loadDashboard() {
+        async function fetchSettings() {
             try {
-                const res = await fetch(`${API}/dashboard`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
-                const data = await res.json();
-                
-                if (res.ok) {
-                    document.getElementById('totalUsers').textContent = data.stats.total_users;
-                    document.getElementById('todayDownloads').textContent = data.stats.today_downloads;
-                    document.getElementById('pendingPayments').textContent = data.stats.pending_payments;
-                    document.getElementById('openTickets').textContent = data.stats.open_tickets;
-                    
-                    document.getElementById('userCountBadge').textContent = data.stats.total_users;
-                    document.getElementById('paymentBadge').textContent = data.stats.pending_payments;
-                    document.getElementById('ticketBadge').textContent = data.stats.open_tickets;
-                    
-                    // Recent users table
-                    const tbody = document.getElementById('recentUsersTable');
-                    tbody.innerHTML = data.recent_users.map(u => `
-                        <tr>
-                            <td>
-                                <div class="user-cell">
-                                    <div class="avatar">${u.username[0].toUpperCase()}</div>
-                                    <div>
-                                        <div style="font-weight:700">${u.username}</div>
-                                        <div style="font-size:0.85rem;color:var(--text-secondary)">${u.email || 'No email'}</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td><span class="plan-badge plan-${u.plan.toLowerCase().replace(' ', '-')}">${u.plan}</span></td>
-                            <td>${u.tokens === 999999 ? '∞' : u.tokens}</td>
-                            <td>${new Date(u.created_at).toLocaleDateString()}</td>
-                        </tr>
-                    `).join('');
-                    
-                    // Render chart
-                    renderChart(data.analytics);
-                }
-            } catch (e) {
-                console.error('Failed to load dashboard:', e);
-            }
-        }
-
-        function renderChart(analytics) {
-            const ctx = document.getElementById('analyticsChart').getContext('2d');
-            
-            if (analyticsChart) {
-                analyticsChart.destroy();
-            }
-            
-            const dates = analytics.map(a => new Date(a.date).toLocaleDateString());
-            const downloads = analytics.map(a => a.total_downloads);
-            
-            analyticsChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: dates,
-                    datasets: [{
-                        label: 'Downloads',
-                        data: downloads,
-                        borderColor: '#d62976',
-                        backgroundColor: 'rgba(214, 41, 118, 0.1)',
-                        tension: 0.4,
-                        fill: true
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            grid: { color: 'rgba(255,255,255,0.1)' },
-                            ticks: { color: '#888' }
-                        },
-                        x: {
-                            grid: { display: false },
-                            ticks: { color: '#888' }
-                        }
-                    }
-                }
-            });
-        }
-
-        async function loadUsers(page = 1) {
-            try {
-                const res = await fetch(`${API}/users?page=${page}`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
-                const data = await res.json();
-                
-                if (res.ok) {
-                    const tbody = document.getElementById('usersTable');
-                    tbody.innerHTML = data.users.map(u => `
-                        <tr>
-                            <td>
-                                <div class="user-cell">
-                                    <div class="avatar">${u.username[0].toUpperCase()}</div>
-                                    <div style="font-weight:700">${u.username}</div>
-                                </div>
-                            </td>
-                            <td>${u.email || '-'}</td>
-                            <td><span class="plan-badge plan-${u.plan.toLowerCase().replace(' ', '-')}">${u.plan}</span></td>
-                            <td>${u.tokens === 999999 ? '∞' : u.tokens}</td>
-                            <td>${u.total_downloads || 0}</td>
-                            <td>
-                                <button class="btn btn-secondary" style="padding:6px 12px;" onclick="editUser(${u.id})">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button class="btn btn-danger" style="padding:6px 12px;" onclick="banUser(${u.id})">
-                                    <i class="fas fa-ban"></i>
-                                </button>
-                            </td>
-                        </tr>
-                    `).join('');
-                }
-            } catch (e) {
-                console.error('Failed to load users:', e);
-            }
-        }
-
-        async function loadPayments(status) {
-            try {
-                const res = await fetch(`${API}/payments?status=${status}`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
-                const data = await res.json();
-                
-                if (res.ok) {
-                    const tbody = document.getElementById('paymentsTable');
-                    tbody.innerHTML = data.payments.map(p => `
-                        <tr>
-                            <td>
-                                <div style="font-weight:700">${p.username}</div>
-                                <div style="font-size:0.85rem;color:var(--text-secondary)">${p.email}</div>
-                            </td>
-                            <td>${p.plan_name}</td>
-                            <td>₹${p.amount}</td>
-                            <td>${new Date(p.created_at).toLocaleDateString()}</td>
-                            <td><span class="status-badge status-${p.status}">${p.status}</span></td>
-                            <td>
-                                ${p.status === 'pending' ? `
-                                    <button class="btn btn-primary" style="padding:6px 12px;" onclick="processPayment(${p.id}, 'approve')">
-                                        <i class="fas fa-check"></i> Approve
-                                    </button>
-                                    <button class="btn btn-danger" style="padding:6px 12px;" onclick="processPayment(${p.id}, 'reject')">
-                                        <i class="fas fa-times"></i> Reject
-                                    </button>
-                                ` : '-'}
-                            </td>
-                        </tr>
-                    `).join('');
-                }
-            } catch (e) {
-                console.error('Failed to load payments:', e);
-            }
-        }
-
-        async function processPayment(id, action) {
-            if (!confirm(`Are you sure you want to ${action} this payment?`)) return;
-            
-            try {
-                const res = await fetch(`${API}/payment/process`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ payment_id: id, action })
-                });
-                
-                if (res.ok) {
-                    loadPayments('pending');
-                    loadDashboard();
-                }
-            } catch (e) {
-                alert('Failed to process payment');
-            }
+                const res = await fetch(`${API}/settings`, { headers: {'Authorization': `Bearer ${token}`} });
+                const d = await res.json();
+                document.getElementById('maintSwitch').checked = d.maintenance;
+                document.getElementById('annInp').value = d.announcement;
+            } catch(e) { console.log("Settings fetch failed"); }
         }
 
         async function saveSettings() {
-            const settings = {
-                site_name: document.getElementById('siteName').value,
-                announcement: document.getElementById('globalAnnouncement').value,
-                maintenance: document.getElementById('maintenanceMode').checked
-            };
+            const maint = document.getElementById('maintSwitch').checked;
+            const ann = document.getElementById('annInp').value;
+            await fetch(`${API}/settings`, {
+                method: 'POST', headers: {'Content-Type':'application/json', 'Authorization': `Bearer ${token}`},
+                body: JSON.stringify({ maintenance: maint, announcement: ann })
+            });
+            alert("Settings Saved");
+        }
+
+        async function fetchBans() {
+            const res = await fetch(`${API}/ban`, { headers: {'Authorization': `Bearer ${token}`} });
+            const d = await res.json();
+            document.getElementById('banBody').innerHTML = d.map(b => `
+                <tr><td>${b.ip}</td><td>${b.reason}</td><td>${new Date(b.timestamp).toLocaleDateString()}</td>
+                <td><button class="btn btn-success" style="padding:2px 8px" onclick="unbanIp('${b.ip}')">Unban</button></td></tr>
+            `).join('');
+        }
+
+        async function banIp() {
+            const ip = document.getElementById('banIpInp').value;
+            if(!ip) return;
+            await fetch(`${API}/ban`, { method:'POST', headers: {'Content-Type':'application/json', 'Authorization': `Bearer ${token}`}, body: JSON.stringify({ip}) });
+            document.getElementById('banIpInp').value = '';
+            fetchBans();
+        }
+
+        async function unbanIp(ip) {
+            await fetch(`${API}/ban`, { method:'DELETE', headers: {'Content-Type':'application/json', 'Authorization': `Bearer ${token}`}, body: JSON.stringify({ip}) });
+            fetchBans();
+        }
+
+        async function fetchUsers() {
+            const btn = document.getElementById('btnUsr');
+            if(btn) btn.innerText = "...";
+            
+            const res = await fetch(`${API}/users`, { headers: {'Authorization': `Bearer ${token}`} });
+            const d = await res.json();
+            
+            document.getElementById('totalUsers').innerText = d.users.length;
+            document.getElementById('totalCredits').innerText = d.users.reduce((a,b)=>a+b.tokens,0);
+            
+            document.getElementById('userBody').innerHTML = d.users.map(u => `
+                <tr>
+                    <td>
+                        <div style="font-weight:bold">${u.username}</div>
+                        <span class="badge ${u.is_admin?'btn-primary':'bg-red'}">${u.is_admin?'Admin':'User'}</span>
+                        <div style="font-size:0.8rem; color:#666">${u.email || 'No Email'}</div>
+                    </td>
+                    <td>${u.plan}</td>
+                    <td>${u.tokens}</td>
+                    <td>
+                        <div class="action-btn-group">
+                            <button class="btn btn-success" onclick="addCredits(${u.id})" title="Add Credits"><i class="fas fa-plus"></i></button>
+                            <button class="btn btn-primary" onclick="toggleAdmin(${u.id}, ${u.is_admin})" title="Toggle Admin"><i class="fas fa-user-shield"></i></button>
+                            <button class="btn btn-warn" onclick="resetPass(${u.id})" title="Reset Password"><i class="fas fa-key"></i></button>
+                            <button class="btn btn-danger" onclick="delUser(${u.id})" title="Delete User"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+            
+            if(btn) btn.innerText = "Refresh";
+        }
+
+        async function addCredits(id) {
+            const amount = prompt("Enter amount of credits to add (e.g. 50, 100):", "50");
+            if(amount) {
+                await fetch(`${API}/credits`, { 
+                    method:'POST', 
+                    headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`}, 
+                    body:JSON.stringify({user_id:id, amount:amount})
+                });
+                fetchUsers();
+            }
+        }
+
+        async function toggleAdmin(id, currentStatus) {
+            const newStatus = !currentStatus;
+            if(confirm(`Make this user ${newStatus ? 'Admin' : 'Regular User'}?`)) {
+                await fetch(`${API}/promote`, { 
+                    method:'POST', 
+                    headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`}, 
+                    body:JSON.stringify({user_id:id, is_admin:newStatus})
+                });
+                fetchUsers();
+            }
+        }
+
+        async function resetPass(id) {
+            const newPass = prompt("Enter new password for this user:");
+            if(newPass) {
+                await fetch(`${API}/reset-password`, { 
+                    method:'POST', 
+                    headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`}, 
+                    body:JSON.stringify({user_id:id, password:newPass})
+                });
+                alert("Password Updated");
+            }
+        }
+
+        async function delUser(id) {
+            if(confirm("Are you sure you want to delete this user? This cannot be undone.")) {
+                await fetch(`${API}/user/${id}`, { method:'DELETE', headers:{'Authorization':`Bearer ${token}`} });
+                fetchUsers();
+            }
+        }
+
+        async function fetchRequests() {
+            const btn = document.getElementById('btnReq');
+            if(btn) btn.innerText = "...";
+            
+            const res = await fetch(`${API}/requests`, { headers: {'Authorization': `Bearer ${token}`} });
+            const d = await res.json();
+            document.getElementById('reqBody').innerHTML = d.requests.map(r => `
+                <tr>
+                    <td>${r.username}</td>
+                    <td><span class="badge bg-blue">${r.plan_name}</span></td>
+                    <td><button class="btn" style="border:1px solid #555" onclick="showProof('${r.screenshot_path}')">View</button></td>
+                    <td>
+                        <button class="btn btn-success" onclick="handleReq(${r.id}, 'approve')"><i class="fas fa-check"></i></button>
+                        <button class="btn btn-danger" onclick="handleReq(${r.id}, 'reject')"><i class="fas fa-times"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+            
+            if(btn) btn.innerText = "Refresh";
+        }
+
+        async function handleReq(id, action) {
+            await fetch(`${API}/approve`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`}, body:JSON.stringify({request_id:id, action})});
+            fetchRequests(); fetchUsers();
+        }
+
+        // MESSAGES LOGIC (NEW)
+        async function fetchMessages() {
+            try {
+                const res = await fetch(`${API}/messages`, { headers: {'Authorization': `Bearer ${token}`} });
+                const data = await res.json();
+                
+                const tbody = document.getElementById('msgBody');
+                if(data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#555">No messages yet</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = data.map(m => `
+                    <tr>
+                        <td style="font-weight:bold; color:white">${m.name || 'Anon'}</td>
+                        <td style="color:var(--primary)">${m.email || 'No Email'}</td>
+                        <td style="color:#aaa; max-width:300px; white-space:pre-wrap;">${m.message}</td>
+                        <td style="font-size:0.8rem">${new Date(m.timestamp).toLocaleDateString()}</td>
+                        <td>
+                            <button class="btn btn-danger" onclick="deleteMessage(${m.id})"><i class="fas fa-trash"></i></button>
+                            <a href="mailto:${m.email}" class="btn btn-primary" style="text-decoration:none; display:inline-block"><i class="fas fa-reply"></i></a>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch(e) { console.log("Error fetching messages"); }
+        }
+
+        async function deleteMessage(id) {
+            if(!confirm("Delete this message?")) return;
+            await fetch(`${API}/message/${id}`, { method:'DELETE', headers: {'Authorization': `Bearer ${token}`} });
+            fetchMessages();
+        }
+
+        // FIX: SECURE IMAGE PREVIEW
+        async function showProof(path) {
+            document.getElementById('proofModal').style.display = 'flex';
+            document.getElementById('proofLoading').style.display = 'block';
+            document.getElementById('proofImg').style.display = 'none';
             
             try {
-                const res = await fetch(`${API}/settings`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(settings)
+                // Fetch image using the token header (same as API)
+                const res = await fetch(`/uploads/${path}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
                 });
                 
                 if (res.ok) {
-                    alert('Settings saved');
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const img = document.getElementById('proofImg');
+                    img.src = url;
+                    img.style.display = 'block';
+                } else {
+                    alert("Unable to load image (403 Access Denied)");
                 }
             } catch (e) {
-                alert('Failed to save settings');
+                alert("Error loading image");
+            } finally {
+                document.getElementById('proofLoading').style.display = 'none';
             }
         }
 
-        function refreshData() {
-            loadDashboard();
-        }
-
-        function editUser(id) {
-            // Implementation for user editing modal
-            alert('Edit user ' + id);
-        }
-
-        function banUser(id) {
-            if (confirm('Ban this user?')) {
-                // Implementation
-            }
-        }
+        init();
     </script>
 </body>
 </html>
