@@ -1,588 +1,2212 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>In.dl - Instagram & Reels Downloader</title>
+    <title>In.dl - Ultimate Media Downloader</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
-        :root { --bg-deep: #000000; --primary: #d62976; --glass: rgba(20, 20, 20, 0.9); --border: rgba(255, 255, 255, 0.15); --text-main: #ffffff; --text-dim: #888; --font: 'Segoe UI', Roboto, sans-serif; --gold: #ffd700; --success: #00ff88; }
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: var(--font); }
-        body { background-color: var(--bg-deep); background-image: radial-gradient(circle at 50% 50%, #111 0%, #000 100%); color: var(--text-main); min-height: 100vh; overflow-x: hidden; }
-        
-        .void-stream { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; overflow: hidden; pointer-events: none; }
-        .stream-icon { position: absolute; color: rgba(255, 255, 255, 0.08); font-size: 2.5rem; animation: floatRise linear infinite; text-shadow: 0 0 10px rgba(255, 255, 255, 0.05); }
-        @keyframes floatRise { 0% { transform: translateY(110vh) scale(0.8) rotate(0deg); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(-10vh) scale(1.5) rotate(360deg); opacity: 0; } }
-        
-        #announcementBar { background: var(--primary); color: white; text-align: center; padding: 8px; font-weight: bold; font-size: 0.9rem; display: none; z-index: 200; position: relative; }
-        #maintOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 9999; display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+        :root {
+            --primary: #d62976;
+            --primary-light: #ff4d94;
+            --primary-dark: #a61d59;
+            --secondary: #00d4ff;
+            --success: #00ff88;
+            --warning: #ffb800;
+            --danger: #ff0033;
+            --gold: #ffd700;
+            
+            --bg-primary: #000000;
+            --bg-secondary: #0a0a0a;
+            --bg-glass: rgba(255, 255, 255, 0.03);
+            --bg-glass-hover: rgba(255, 255, 255, 0.06);
+            --border: rgba(255, 255, 255, 0.1);
+            --border-active: rgba(214, 41, 118, 0.5);
+            
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0a0;
+            --text-muted: #666666;
+            
+            --gradient-1: linear-gradient(135deg, #d62976 0%, #fda75b 100%);
+            --gradient-2: linear-gradient(135deg, #00d4ff 0%, #0099ff 100%);
+            --gradient-dark: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.8) 100%);
+            
+            --shadow-glow: 0 0 40px rgba(214, 41, 118, 0.3);
+            --shadow-card: 0 10px 40px rgba(0, 0, 0, 0.4);
+            
+            --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 20px;
+            --radius-xl: 28px;
+        }
 
-        header { background: rgba(0,0,0,0.8); backdrop-filter: blur(20px); padding: 20px 0; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; }
-        .nav-container { max-width: 1200px; margin: 0 auto; padding: 0 25px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
-        .logo { font-size: 1.8rem; font-weight: 900; letter-spacing: -1px; display: flex; align-items: center; gap: 12px; text-shadow: 0 0 20px var(--primary-glow); }
-        .logo i { color: var(--primary); filter: drop-shadow(0 0 10px var(--primary)); }
-        
-        .user-nav { display: flex; gap: 20px; align-items: center; }
-        .profile-wrap { position: relative; display: inline-block; }
-        .profile-btn { width: 45px; height: 45px; border-radius: 50%; background: rgba(255,255,255,0.05); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.3s; color: white; font-size: 1.2rem; user-select: none; }
-        .profile-btn:hover, .profile-btn.active { border-color: var(--primary); background: var(--glass); box-shadow: 0 0 15px var(--primary-glow); }
-        .dropdown-menu { position: absolute; right: 0; top: 120%; width: 220px; background: #0a0a0a; border: 1px solid #333; border-radius: 15px; padding: 20px; display: none; flex-direction: column; gap: 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); z-index: 1000; text-align: center; }
-        .dropdown-menu.show { display: flex; animation: slideUp 0.3s ease; }
-        .dd-user { font-weight: 900; font-size: 1.2rem; color: white; margin-bottom: 2px; }
-        .dd-role { font-size: 0.8rem; color: #888; background: #222; padding: 4px 10px; border-radius: 50px; display: inline-block; margin-bottom: 15px; border: 1px solid #333; }
-        .dd-link { display: block; padding: 8px; color: #aaa; text-decoration: none; font-size: 0.9rem; transition: 0.2s; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; }
-        .dd-link:hover { background: #222; color: white; }
-        
-        .token-pill { background: rgba(255,255,255,0.08); border: 1px solid var(--border); padding: 8px 16px; border-radius: 50px; font-size: 0.9rem; font-weight: 600; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: 0.3s; white-space: nowrap; }
-        .token-pill:hover { background: rgba(255,255,255,0.15); border-color: var(--primary); transform: scale(1.05); }
-        .token-pill i { color: gold; animation: spinCoin 4s infinite linear; }
-        @keyframes spinCoin { 100% { transform: rotateY(360deg); } }
-        
-        .liquid-btn { position: relative; overflow: hidden; background: var(--primary); color: white; border: none; padding: 10px 25px; border-radius: 50px; font-weight: 700; cursor: pointer; box-shadow: 0 0 20px var(--primary-glow); transition: 0.3s; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; }
-        .liquid-btn:hover { transform: scale(1.05); box-shadow: 0 0 40px var(--primary-glow); }
-        .liquid-btn:disabled { background: #555; box-shadow: none; cursor: not-allowed; opacity: 0.6; }
-        
-        .container { max-width: 1000px; margin: 0 auto; padding: 60px 20px; }
-        .hero { text-align: center; margin-bottom: 60px; }
-        .hero h1 { font-size: 4.5rem; font-weight: 900; margin-bottom: 15px; background: linear-gradient(to bottom, #fff, #aaa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; line-height: 1.1; }
-        .hero p { color: var(--text-dim); font-size: 1.2rem; }
-        
-        .search-container { position: relative; margin-bottom: 80px; z-index: 10; }
-        .search-bar { background: rgba(20,20,20,0.9); border: 1px solid var(--border); border-radius: 20px; padding: 8px; display: flex; align-items: center; box-shadow: 0 20px 50px rgba(0,0,0,0.5); transition: 0.3s; }
-        .search-bar:focus-within { border-color: var(--primary); box-shadow: 0 0 30px var(--primary-glow); transform: scale(1.02); }
-        .paste-icon { width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; color: #555; cursor: pointer; font-size: 1.2rem; border-right: 1px solid var(--border); flex-shrink: 0; }
-        .paste-icon:hover { color: white; }
-        .url-inp { flex: 1; background: transparent; border: none; padding: 0 20px; font-size: 1.2rem; color: white; outline: none; height: 50px; width: 100%; min-width: 0; }
-        .go-btn { background: var(--primary); color: white; border: none; width: 60px; height: 50px; border-radius: 14px; cursor: pointer; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; transition: 0.3s; box-shadow: 0 0 15px var(--primary-glow); flex-shrink: 0; }
-        .go-btn:hover { transform: scale(1.1); border-radius: 50%; }
-        
-        /* Modals and Cards */
-        .modal-wrap { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 2000; display: none; justify-content: center; align-items: center; backdrop-filter: blur(10px); padding: 20px; }
-        .modal-box { background: #111; padding: 40px; width: 100%; max-width: 400px; border-radius: 30px; border: 1px solid #333; box-shadow: 0 0 100px rgba(255,0,0,0.2); text-align: center; position: relative; animation: popUp 0.5s ease; overflow-y: auto; max-height: 90vh; }
-        .success-icon-box { width: 80px; height: 80px; border-radius: 50%; background: var(--primary); margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 30px var(--primary-glow); animation: bounceIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-        .success-icon-box i { font-size: 40px; color: white; }
-        .modal-inp { width: 100%; padding: 15px; background: #000; border: 1px solid #333; color: white; margin: 10px 0; border-radius: 12px; font-size: 1rem; outline: none; }
-        .modal-inp:focus { border-color: var(--primary); }
-        
-        #planModal .modal-box { width: 100%; max-width: 900px; background: transparent; box-shadow: none; border: none; padding: 10px; }
-        .pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
-        .plan-card { background: #0a0a0a; border: 1px solid #333; border-radius: 20px; padding: 30px; position: relative; display: flex; flex-direction: column; align-items: center; transition: 0.3s; }
-        .plan-card:hover { transform: translateY(-10px); border-color: var(--primary); box-shadow: 0 0 30px rgba(0,0,0,0.5); }
-        .plan-card.active-plan { border-color: var(--primary); background: rgba(214, 41, 118, 0.05); }
-        .plan-card.premium { border-color: var(--gold); }
-        .plan-card.premium:hover { box-shadow: 0 0 30px rgba(255, 215, 0, 0.2); }
-        .best-value { position: absolute; top: -12px; background: var(--gold); color: black; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 800; }
-        .plan-name { font-size: 1.5rem; font-weight: 700; margin-bottom: 10px; }
-        .price-tag { font-size: 2.5rem; font-weight: 900; margin-bottom: 20px; display: flex; align-items: flex-start; gap: 5px; }
-        .price-currency { font-size: 1rem; margin-top: 10px; color: #888; }
-        .plan-features { list-style: none; text-align: left; width: 100%; margin: 20px 0; }
-        .plan-features li { padding: 8px 0; border-bottom: 1px solid #222; color: #ccc; font-size: 0.9rem; }
-        .plan-features li i { color: var(--primary); width: 25px; }
-        .plan-features li.check-gold i { color: var(--gold); }
-        .plan-btn { width: 100%; padding: 12px; border-radius: 12px; font-weight: 700; cursor: pointer; border: 1px solid #333; background: transparent; color: white; transition: 0.2s; }
-        .plan-btn:hover { background: var(--primary); border-color: var(--primary); }
-        .plan-btn.gold-btn { background: var(--gold); color: black; border-color: var(--gold); }
-        .plan-btn.gold-btn:hover { background: white; }
-        .plan-btn.current { background: #222; cursor: default; color: #666; }
-        
-        .qr-img { width: 100%; max-width: 250px; border-radius: 15px; margin-bottom: 20px; border: 2px solid white; display:block; margin-left:auto; margin-right:auto; }
-        .upi-box { background: #222; padding: 10px 15px; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; border: 1px solid #333; flex-wrap: wrap; gap: 10px; }
-        .upi-text { font-family: monospace; font-size: 1.1rem; color: var(--gold); word-break: break-all; }
-        .copy-btn { color: #888; cursor: pointer; transition: 0.2s; }
-        .copy-btn:hover { color: white; }
-        #stepUpload { display: none; animation: slideUp 0.4s ease; }
-        #stepScan { animation: popUp 0.4s ease; }
-        
-        .dark-card { background: var(--glass); backdrop-filter: blur(15px); border: 1px solid var(--border); border-radius: 20px; padding: 30px; margin-bottom: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        #resultCard { display: none; animation: slideUp 0.6s ease-out; }
-        .res-top { display: flex; gap: 25px; margin-bottom: 25px; border-bottom: 1px solid var(--border); padding-bottom: 25px; flex-wrap: wrap; }
-        .res-img { width: 160px; height: 160px; object-fit: cover; border-radius: 12px; background: #111; flex-shrink: 0; }
-        .fmt-item { display: flex; justify-content: space-between; align-items: center; padding: 15px; margin-bottom: 10px; background: rgba(255,255,255,0.03); border-radius: 12px; transition: 0.2s; flex-wrap: wrap; gap: 10px; }
-        .fmt-item:hover { background: rgba(255,255,255,0.08); border-color: var(--primary); }
-        .dl-mini-btn { background: white; color: black; border: none; padding: 8px 20px; border-radius: 8px; font-weight: 800; cursor: pointer; transition: 0.2s; }
-        .dl-mini-btn:hover { background: var(--primary); color: white; box-shadow: 0 0 15px var(--primary); }
-        
-        .section-head { margin: 60px 0 30px; font-size: 1.5rem; letter-spacing: 2px; text-transform: uppercase; color: #555; text-align: center; }
-        
-        .step-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
-        .step-card { background: var(--glass); padding: 30px; border-radius: 20px; border: 1px solid var(--border); text-align: center; transition: 0.3s; }
-        .step-card:hover { transform: translateY(-5px); border-color: var(--primary); }
-        .step-icon { width: 60px; height: 60px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 1.5rem; color: white; box-shadow: 0 0 20px var(--primary-glow); }
-        
-        .history-track { display: flex; gap: 20px; overflow-x: auto; padding-bottom: 20px; }
-        .history-track::-webkit-scrollbar { height: 4px; }
-        .history-track::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
-        .hist-card { min-width: 200px; padding: 15px; cursor: pointer; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px; background: rgba(255,255,255,0.02); border-radius: 15px; transition: 0.3s; }
-        .hist-card:hover { background: rgba(255,255,255,0.05); border-color: var(--primary); }
-        .hist-img { width: 100%; height: 110px; object-fit: cover; border-radius: 10px; opacity: 0.7; transition: 0.3s; background: #111; }
-        .hist-card:hover .hist-img { opacity: 1; }
-        
-        .grid-box { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 20px; }
-        .quick-card { padding: 25px; display: flex; flex-direction: column; align-items: center; gap: 15px; text-decoration: none; color: white; border: 1px solid var(--border); background: rgba(255,255,255,0.02); border-radius: 20px; transition: 0.3s; }
-        .quick-icon { width: 60px; height: 60px; background: rgba(255,255,255,0.05); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: var(--primary); transition: 0.4s; }
-        .quick-card:hover { transform: translateY(-5px); border-color: var(--primary); }
-        .quick-card:hover .quick-icon { transform: rotate(360deg); background: var(--primary); color: white; box-shadow: 0 0 30px var(--primary); }
-        
-        .faq-item { background: rgba(255,255,255,0.02); border-bottom: 1px solid var(--border); margin-bottom: 10px; border-radius: 10px; overflow: hidden; transition: 0.3s; }
-        .faq-question { padding: 20px; font-weight: 600; cursor: pointer; display: flex; justify-content: space-between; }
-        .faq-answer { max-height: 0; overflow: hidden; padding: 0 20px; color: var(--text-dim); transition: 0.4s ease; }
-        .faq-item.active .faq-answer { max-height: 200px; padding-bottom: 20px; }
-        
-        footer { background: #050505; border-top: 1px solid var(--border); padding: 60px 0 30px; margin-top: 80px; }
-        .footer-grid { max-width: 1200px; margin: 0 auto; padding: 0 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 40px; }
-        .footer-link { display: block; color: #666; text-decoration: none; margin-bottom: 10px; transition: 0.3s; }
-        .footer-link:hover { color: var(--primary); }
-        
-        @keyframes popUp { from { opacity:0; transform:scale(0.8); } to { opacity:1; transform:scale(1); } }
-        @keyframes bounceIn { 0%{transform:scale(0);} 60%{transform:scale(1.2);} 100%{transform:scale(1);} }
-        @keyframes slideUp { from { opacity:0; transform:translateY(50px); } to { opacity:1; transform:translateY(0); } }
-        
+        [data-theme="light"] {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f5f5f5;
+            --bg-glass: rgba(0, 0, 0, 0.03);
+            --bg-glass-hover: rgba(0, 0, 0, 0.06);
+            --border: rgba(0, 0, 0, 0.1);
+            --text-primary: #000000;
+            --text-secondary: #555555;
+            --text-muted: #888888;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: var(--font);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        /* Animated Background */
+        .ambient-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.4;
+            animation: float 20s infinite ease-in-out;
+        }
+
+        .orb-1 {
+            width: 600px;
+            height: 600px;
+            background: var(--primary);
+            top: -200px;
+            left: -200px;
+            animation-delay: 0s;
+        }
+
+        .orb-2 {
+            width: 500px;
+            height: 500px;
+            background: var(--secondary);
+            bottom: -150px;
+            right: -100px;
+            animation-delay: -5s;
+        }
+
+        .orb-3 {
+            width: 300px;
+            height: 300px;
+            background: var(--gold);
+            top: 50%;
+            left: 50%;
+            animation-delay: -10s;
+            opacity: 0.2;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(30px, -30px) scale(1.1); }
+            66% { transform: translate(-20px, 20px) scale(0.9); }
+        }
+
+        /* Grid Pattern Overlay */
+        .grid-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 50px 50px;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* Header */
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(20px);
+            background: rgba(0,0,0,0.6);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .header-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.8rem;
+            font-weight: 800;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+
+        .logo:hover {
+            transform: scale(1.05);
+        }
+
+        .logo i {
+            font-size: 2rem;
+            -webkit-text-fill-color: var(--primary);
+            filter: drop-shadow(0 0 10px rgba(214, 41, 118, 0.5));
+        }
+
+        .nav-items {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .theme-toggle {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            border: 1px solid var(--border);
+            background: var(--bg-glass);
+            color: var(--text-primary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            font-size: 1.2rem;
+        }
+
+        .theme-toggle:hover {
+            background: var(--bg-glass-hover);
+            transform: rotate(180deg);
+        }
+
+        .credits-display {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .credits-display::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+            transition: left 0.5s;
+        }
+
+        .credits-display:hover::before {
+            left: 100%;
+        }
+
+        .credits-display:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .credits-display i {
+            color: var(--gold);
+            animation: coinSpin 4s infinite linear;
+        }
+
+        @keyframes coinSpin {
+            0% { transform: rotateY(0deg); }
+            100% { transform: rotateY(360deg); }
+        }
+
+        .credits-count {
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .user-menu {
+            position: relative;
+        }
+
+        .user-avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            border: 2px solid var(--border);
+            background: var(--bg-glass);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            color: var(--text-primary);
+            transition: all 0.3s;
+        }
+
+        .user-avatar:hover, .user-avatar.active {
+            border-color: var(--primary);
+            box-shadow: 0 0 20px rgba(214, 41, 118, 0.4);
+        }
+
+        .dropdown {
+            position: absolute;
+            top: 120%;
+            right: 0;
+            width: 280px;
+            background: rgba(10, 10, 10, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            opacity: 0;
+            transform: translateY(-10px);
+            pointer-events: none;
+            transition: all 0.3s;
+            box-shadow: var(--shadow-card);
+        }
+
+        .dropdown.active {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: all;
+        }
+
+        .dropdown-header {
+            text-align: center;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 15px;
+        }
+
+        .dropdown-username {
+            font-weight: 700;
+            font-size: 1.1rem;
+            margin-bottom: 5px;
+        }
+
+        .dropdown-plan {
+            display: inline-block;
+            padding: 4px 12px;
+            background: var(--gradient-1);
+            border-radius: 50px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: white;
+        }
+
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--text-secondary);
+            text-decoration: none;
+        }
+
+        .dropdown-item:hover {
+            background: var(--bg-glass);
+            color: var(--text-primary);
+        }
+
+        .dropdown-item i {
+            width: 24px;
+            text-align: center;
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 12px;
+            margin-top: 10px;
+            background: var(--gradient-1);
+            border: none;
+            border-radius: var(--radius-md);
+            color: white;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-glow);
+        }
+
+        /* Main Container */
+        .main-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 60px 20px;
+        }
+
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            margin-bottom: 60px;
+            animation: fadeInUp 0.8s ease;
+        }
+
+        .hero h1 {
+            font-size: clamp(2.5rem, 5vw, 4.5rem);
+            font-weight: 900;
+            margin-bottom: 20px;
+            line-height: 1.1;
+            background: linear-gradient(to bottom, #fff 0%, #aaa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .gradient-text {
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Platform Icons */
+        .platforms {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 40px 0;
+            flex-wrap: wrap;
+        }
+
+        .platform-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: var(--radius-md);
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            color: var(--text-muted);
+            transition: all 0.3s;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .platform-icon:hover {
+            transform: translateY(-5px);
+            color: var(--text-primary);
+            border-color: var(--primary);
+            box-shadow: 0 10px 30px rgba(214, 41, 118, 0.2);
+        }
+
+        .platform-icon.active {
+            background: var(--gradient-1);
+            color: white;
+            border-color: transparent;
+        }
+
+        /* Search Box */
+        .search-wrapper {
+            position: relative;
+            margin-bottom: 40px;
+            animation: fadeInUp 0.8s ease 0.2s both;
+        }
+
+        .search-container {
+            background: var(--bg-glass);
+            backdrop-filter: blur(20px);
+            border: 2px solid var(--border);
+            border-radius: var(--radius-xl);
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .search-container:focus-within {
+            border-color: var(--primary);
+            box-shadow: var(--shadow-glow);
+            transform: scale(1.02);
+        }
+
+        .paste-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: var(--radius-lg);
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .paste-btn:hover {
+            background: var(--bg-glass-hover);
+            color: var(--text-primary);
+        }
+
+        .url-input {
+            flex: 1;
+            border: none;
+            background: transparent;
+            color: var(--text-primary);
+            font-size: 1.1rem;
+            padding: 10px;
+            outline: none;
+        }
+
+        .url-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .fetch-btn {
+            width: 60px;
+            height: 50px;
+            border-radius: var(--radius-lg);
+            border: none;
+            background: var(--gradient-1);
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .fetch-btn:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(214, 41, 118, 0.4);
+        }
+
+        .fetch-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        /* Drop Zone */
+        .drop-zone {
+            position: absolute;
+            inset: 0;
+            background: var(--primary);
+            border-radius: var(--radius-xl);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            z-index: 10;
+        }
+
+        .drop-zone.active {
+            opacity: 0.95;
+            pointer-events: all;
+        }
+
+        /* Result Card */
+        .result-card {
+            background: var(--bg-glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 30px;
+            margin-bottom: 30px;
+            display: none;
+            animation: fadeInUp 0.5s ease;
+        }
+
+        .result-card.active {
+            display: block;
+        }
+
+        .video-header {
+            display: flex;
+            gap: 25px;
+            margin-bottom: 25px;
+            padding-bottom: 25px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .video-thumb {
+            width: 200px;
+            height: 120px;
+            object-fit: cover;
+            border-radius: var(--radius-md);
+            background: var(--bg-secondary);
+            flex-shrink: 0;
+        }
+
+        .video-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .video-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            line-height: 1.3;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .video-meta {
+            display: flex;
+            gap: 20px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            flex-wrap: wrap;
+        }
+
+        .video-meta span {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Format List */
+        .format-grid {
+            display: grid;
+            gap: 10px;
+        }
+
+        .format-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px 20px;
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            transition: all 0.3s;
+        }
+
+        .format-item:hover {
+            background: var(--bg-glass-hover);
+            border-color: var(--primary);
+            transform: translateX(5px);
+        }
+
+        .format-details {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .format-quality {
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .format-specs {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        .download-btn {
+            padding: 10px 25px;
+            background: white;
+            color: black;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .download-btn:hover:not(:disabled) {
+            background: var(--primary);
+            color: white;
+            transform: scale(1.05);
+        }
+
+        .download-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            background: var(--bg-secondary);
+            color: var(--text-muted);
+        }
+
+        /* Progress Indicator */
+        .progress-ring {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(0,0,0,0.2);
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            display: none;
+        }
+
+        .download-btn.loading .progress-ring {
+            display: block;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Stats Bar */
+        .stats-bar {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin: 60px 0;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            text-align: center;
+            animation: fadeInUp 0.8s ease both;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 900;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Features Grid */
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin: 60px 0;
+        }
+
+        .feature-card {
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 30px;
+            text-align: center;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--gradient-1);
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 0;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+        }
+
+        .feature-card:hover::before {
+            opacity: 0.05;
+        }
+
+        .feature-icon {
+            width: 70px;
+            height: 70px;
+            margin: 0 auto 20px;
+            background: var(--bg-secondary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            color: var(--primary);
+            position: relative;
+            z-index: 1;
+            border: 2px solid var(--border);
+            transition: all 0.3s;
+        }
+
+        .feature-card:hover .feature-icon {
+            transform: scale(1.1) rotate(10deg);
+            border-color: var(--primary);
+            box-shadow: 0 0 30px rgba(214, 41, 118, 0.3);
+        }
+
+        .feature-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .feature-desc {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            line-height: 1.5;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* History Section */
+        .history-section {
+            margin: 60px 0;
+            display: none;
+        }
+
+        .history-section.visible {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .history-scroll {
+            display: flex;
+            gap: 20px;
+            overflow-x: auto;
+            padding-bottom: 20px;
+            scrollbar-width: thin;
+            scrollbar-color: var(--primary) var(--bg-glass);
+        }
+
+        .history-scroll::-webkit-scrollbar {
+            height: 6px;
+        }
+
+        .history-scroll::-webkit-scrollbar-track {
+            background: var(--bg-glass);
+            border-radius: 3px;
+        }
+
+        .history-scroll::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 3px;
+        }
+
+        .history-item {
+            min-width: 200px;
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .history-item:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+        }
+
+        .history-thumb {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+            opacity: 0.8;
+            transition: opacity 0.3s;
+        }
+
+        .history-item:hover .history-thumb {
+            opacity: 1;
+        }
+
+        .history-info {
+            padding: 15px;
+        }
+
+        .history-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 5px;
+        }
+
+        .history-date {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* Toast Notifications */
+        .toast-container {
+            position: fixed;
+            top: 100px;
+            right: 20px;
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            background: rgba(10, 10, 10, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--primary);
+            border-radius: var(--radius-md);
+            padding: 16px 20px;
+            min-width: 300px;
+            max-width: 400px;
+            box-shadow: var(--shadow-card);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slideInRight 0.3s ease;
+            cursor: pointer;
+        }
+
+        .toast.success { border-left-color: var(--success); }
+        .toast.error { border-left-color: var(--danger); }
+        .toast.warning { border-left-color: var(--warning); }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .toast-icon {
+            font-size: 1.3rem;
+        }
+
+        .toast.success .toast-icon { color: var(--success); }
+        .toast.error .toast-icon { color: var(--danger); }
+        .toast.warning .toast-icon { color: var(--warning); }
+
+        /* Modals */
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(10px);
+            z-index: 2000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .modal.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal-content {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            width: 100%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow: hidden;
+            transform: scale(0.9) translateY(20px);
+            transition: transform 0.3s;
+            position: relative;
+        }
+
+        .modal.active .modal-content {
+            transform: scale(1) translateY(0);
+        }
+
+        .modal.large .modal-content {
+            max-width: 900px;
+        }
+
+        .modal-header {
+            padding: 25px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .modal-close {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: var(--bg-glass);
+            color: var(--text-primary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            font-size: 1.2rem;
+        }
+
+        .modal-close:hover {
+            background: var(--danger);
+            color: white;
+            transform: rotate(90deg);
+        }
+
+        .modal-body {
+            padding: 25px;
+            overflow-y: auto;
+            max-height: calc(90vh - 100px);
+        }
+
+        /* Form Elements */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 14px 16px;
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 1rem;
+            transition: all 0.3s;
+            outline: none;
+        }
+
+        .form-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(214, 41, 118, 0.1);
+        }
+
+        /* Pricing Cards */
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 20px;
+        }
+
+        .pricing-card {
+            background: var(--bg-glass);
+            border: 2px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 30px;
+            text-align: center;
+            position: relative;
+            transition: all 0.3s;
+        }
+
+        .pricing-card.featured {
+            border-color: var(--gold);
+            transform: scale(1.05);
+        }
+
+        .pricing-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .pricing-card.featured:hover {
+            transform: scale(1.05) translateY(-5px);
+        }
+
+        .best-badge {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--gold);
+            color: #000;
+            padding: 6px 16px;
+            border-radius: 50px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .plan-name {
+            font-size: 1.5rem;
+            font-weight: 800;
+            margin-bottom: 10px;
+        }
+
+        .plan-price {
+            font-size: 3rem;
+            font-weight: 900;
+            margin-bottom: 5px;
+        }
+
+        .plan-price span {
+            font-size: 1rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .plan-features {
+            list-style: none;
+            margin: 25px 0;
+            text-align: left;
+        }
+
+        .plan-features li {
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-secondary);
+        }
+
+        .plan-features li:last-child {
+            border-bottom: none;
+        }
+
+        .plan-features i {
+            color: var(--success);
+            width: 20px;
+        }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Loading Skeleton */
+        .skeleton {
+            background: linear-gradient(90deg, var(--bg-glass) 25%, var(--bg-glass-hover) 50%, var(--bg-glass) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: var(--radius-md);
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* Confetti Canvas */
+        #confetti-canvas {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        /* Responsive */
         @media (max-width: 768px) {
-            .nav-container { flex-direction: column; gap: 15px; padding: 0 15px; }
-            .user-nav { width: 100%; justify-content: center; flex-wrap: wrap; }
-            .hero h1 { font-size: 3rem; }
-            .hero p { font-size: 1rem; }
-            .container { padding: 40px 15px; }
-            .search-bar { flex-direction: row; }
-            .url-inp { font-size: 1rem; }
-            .paste-icon, .go-btn { width: 45px; height: 45px; }
-            .res-top { flex-direction: column; align-items: center; text-align: center; }
-            .res-img { width: 100%; height: auto; max-width: 300px; margin-bottom:15px; }
-            .fmt-item { flex-direction: column; text-align: center; gap: 15px; }
-            .dl-mini-btn { width: 100%; }
-            .footer-grid { grid-template-columns: 1fr; text-align: center; gap: 30px; }
+            .header-container {
+                padding: 15px;
+            }
+
+            .nav-items {
+                gap: 10px;
+            }
+
+            .credits-display span {
+                display: none;
+            }
+
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+
+            .video-header {
+                flex-direction: column;
+            }
+
+            .video-thumb {
+                width: 100%;
+                height: 200px;
+            }
+
+            .stats-bar {
+                gap: 20px;
+            }
+
+            .stat-value {
+                font-size: 1.8rem;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="void-stream" id="voidStream"></div>
-
-    <div id="announcementBar"></div>
-
-    <div id="maintOverlay">
-        <i class="fas fa-tools" style="font-size: 4rem; color: var(--primary); margin-bottom: 20px;"></i>
-        <h1 style="font-size: 2.5rem; margin-bottom: 10px;">Under Maintenance</h1>
-        <p style="color: #888;">We are upgrading the servers. Please check back in 15 minutes.</p>
-        <button onclick="location.reload()" class="liquid-btn" style="margin-top:20px; width: auto;">Refresh</button>
+    <!-- Background Effects -->
+    <div class="ambient-bg">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
     </div>
+    <div class="grid-overlay"></div>
+    <canvas id="confetti-canvas"></canvas>
 
-    <div class="modal-wrap" id="authModal">
-        <div class="modal-box">
-            <i class="fas fa-times" onclick="closeModal('authModal')" style="position:absolute; top:20px; right:20px; cursor:pointer; font-size:1.5rem; color:#555"></i>
-            <h2 id="authTitle" style="margin-bottom:10px; font-size:2rem">Login</h2>
-            <p id="authSub" style="color:#666; margin-bottom:30px">Login to remove the 5-download limit.</p>
-            <form id="authForm">
-                <input type="text" id="userInput" class="modal-inp" placeholder="Username" required>
-                <input type="email" id="emailInput" class="modal-inp" placeholder="Email Address" style="display:none;">
-                <input type="password" id="passInput" class="modal-inp" placeholder="Password" required>
-                <button type="submit" id="authSubmitBtn" class="liquid-btn" style="width:100%; margin-top:15px; justify-content:center">LOGIN</button>
-            </form>
-            <p onclick="toggleAuthMode()" style="margin-top:20px; color:#888; cursor:pointer; font-size:0.9rem"><span id="authSwitchText">New User? <span style="color:var(--primary)">Register Here</span></span></p>
-            <p id="authMsg" style="color:red; margin-top:10px; font-size:0.8rem"></p>
-        </div>
-    </div>
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
 
-    <div class="modal-wrap" id="paymentModal">
-        <div class="modal-box">
-            <i class="fas fa-times" onclick="closeModal('paymentModal')" style="position:absolute; top:20px; right:20px; cursor:pointer; font-size:1.5rem; color:#555"></i>
-            <div id="stepScan">
-                <h3 style="margin-bottom:15px; color:white">Scan to Pay</h3>
-                <img src="qr.jpeg" class="qr-img" alt="Scan QR">
-                <div class="upi-box"><span class="upi-text" id="upiId">9369228920@fam</span><i class="fas fa-copy copy-btn" onclick="copyUPI()"></i></div>
-                <button class="liquid-btn" style="width:100%; justify-content:center; background:#222; border:1px solid #333" onclick="showUploadStep()"><i class="fas fa-check-circle" style="margin-right:10px; color:var(--success)"></i> I have made the payment</button>
-            </div>
-            <div id="stepUpload">
-                <h3 style="margin-bottom:15px; color:white">Verify Payment</h3>
-                <p style="color:#888; margin-bottom:20px; font-size:0.9rem">Please upload the payment screenshot to verify.</p>
-                <form onsubmit="submitPayment(event)">
-                    <input type="hidden" id="selectedPlanName">
-                    <input type="file" id="proofFile" class="modal-inp" accept="image/*" required>
-                    <button type="submit" class="liquid-btn" style="width:100%; justify-content:center">SUBMIT PROOF</button>
-                </form>
-                <p style="margin-top:15px; color:#555; cursor:pointer; font-size:0.8rem" onclick="showScanStep()">Go back to QR</p>
-            </div>
-        </div>
-    </div>
-
-    <div class="modal-wrap" id="planModal">
-        <div class="modal-box">
-            <i class="fas fa-times" onclick="closeModal('planModal')" style="position:absolute; top:20px; right:20px; cursor:pointer; font-size:1.5rem; color:white; z-index:100"></i>
-            <h2 style="margin-bottom:40px; font-size:2.5rem; color:white">Choose Your Power</h2>
-            <div class="pricing-grid">
-                <div class="plan-card active-plan">
-                    <div class="plan-name">Starter</div>
-                    <div class="price-tag">Free <span class="price-currency">/forever</span></div>
-                    <ul class="plan-features">
-                        <li><i class="fas fa-check"></i> 15-25 Credits Daily</li>
-                        <li><i class="fas fa-check"></i> Standard Speed</li>
-                        <li><i class="fas fa-times" style="color:#444"></i> No Priority Support</li>
-                    </ul>
-                    <button class="plan-btn current">Current Plan</button>
-                </div>
-                <div class="plan-card">
-                    <div class="plan-name">Booster</div>
-                    <div class="price-tag">25 <span class="price-currency">rs</span></div>
-                    <ul class="plan-features">
-                        <li><i class="fas fa-check"></i> 50 Credits Instant</li>
-                        <li><i class="fas fa-check"></i> High Speed</li>
-                        <li><i class="fas fa-check"></i> Ad-free Experience</li>
-                    </ul>
-                    <button class="plan-btn" onclick="openPaymentModal('Booster')">Get Credits</button>
-                </div>
-                <div class="plan-card premium">
-                    <div class="best-value">BEST VALUE</div>
-                    <div class="plan-name" style="color:var(--gold)">God Mode</div>
-                    <div class="price-tag" style="color:var(--gold)">70 <span class="price-currency">rs</span></div>
-                    <ul class="plan-features">
-                        <li class="check-gold"><i class="fas fa-bolt"></i> Unlimited Credits</li>
-                        <li class="check-gold"><i class="fas fa-bolt"></i> Max Quality</li>
-                        <li class="check-gold"><i class="fas fa-bolt"></i> Priority Processing</li>
-                        <li class="check-gold"><i class="fas fa-bolt"></i> 24/7 Support</li>
-                    </ul>
-                    <button class="plan-btn gold-btn" onclick="openPaymentModal('God Mode')">Go Unlimited</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="modal-wrap" id="successModal">
-        <div class="modal-box">
-            <i class="fas fa-times" onclick="closeModal('successModal')" style="position:absolute; top:20px; right:20px; cursor:pointer; font-size:1.5rem; color:#555"></i>
-            <div class="success-icon-box"><i class="fas fa-check"></i></div>
-            <h2 style="margin-bottom:10px; font-size:1.8rem">Download Complete</h2>
-            <p style="color:#666; margin-bottom:30px">Your file has been saved successfully.</p>
-            <button class="liquid-btn" onclick="closeModal('successModal')" style="width:100%; justify-content:center">OK, GREAT</button>
-        </div>
-    </div>
-
+    <!-- Header -->
     <header>
-        <div class="nav-container">
-            <div class="logo"><i class="fab fa-instagram"></i> In.dl</div>
-            <div class="user-nav">
-                <div class="token-pill" onclick="checkLoginAndOpenPlan()" title="Click to Top-up"><i class="fas fa-coins"></i> <span id="tokenCount">...</span></div>
-                <div id="userArea"></div> 
+        <div class="header-container">
+            <div class="logo" onclick="window.location.reload()">
+                <i class="fas fa-bolt"></i>
+                In.dl
+            </div>
+            
+            <div class="nav-items">
+                <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Theme">
+                    <i class="fas fa-moon" id="themeIcon"></i>
+                </button>
+
+                <div class="credits-display" onclick="openPricing()" title="Get More Credits">
+                    <i class="fas fa-coins"></i>
+                    <span class="credits-count" id="creditsCount">--</span>
+                    <span>credits</span>
+                </div>
+
+                <div class="user-menu">
+                    <div class="user-avatar" onclick="toggleUserMenu(event)" id="userAvatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="dropdown" id="userDropdown">
+                        <div class="dropdown-header">
+                            <div class="dropdown-username" id="dropdownUsername">Guest User</div>
+                            <span class="dropdown-plan" id="dropdownPlan">Free</span>
+                        </div>
+                        
+                        <a href="#" class="dropdown-item" onclick="openHistory()">
+                            <i class="fas fa-history"></i>
+                            <span>Download History</span>
+                        </a>
+                        <a href="#" class="dropdown-item" onclick="openTickets()">
+                            <i class="fas fa-headset"></i>
+                            <span>Support Tickets</span>
+                        </a>
+                        <div class="dropdown-item" id="dailyCheckinItem" onclick="doCheckin()" style="display:none;">
+                            <i class="fas fa-gift"></i>
+                            <span>Daily Reward Available!</span>
+                        </div>
+                        <div class="dropdown-item" id="adminItem" style="display:none;">
+                            <i class="fas fa-shield-alt"></i>
+                            <span>Admin Panel</span>
+                        </div>
+                        
+                        <button class="btn-primary" id="authBtn" onclick="openAuth()">
+                            Login / Register
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </header>
 
-    <div class="container">
-        
+    <!-- Main Content -->
+    <div class="main-container">
+        <!-- Hero -->
         <div class="hero">
-            <h1 id="heroTitle">IG Media Saver</h1>
-            <p id="heroSub">Download Reels, Stories, and Posts instantly.</p>
-        </div>
-
-        <div class="search-container">
-            <div class="search-bar">
-                <div class="paste-icon" onclick="pasteFromClipboard()"><i class="fas fa-paste"></i></div>
-                <input type="text" class="url-inp" id="urlInput" placeholder="Paste Instagram link here...">
-                <button class="go-btn" id="searchBtn" onclick="fetchInfo()"><i class="fas fa-arrow-right"></i></button>
+            <h1>Download from <span class="gradient-text">Anywhere</span></h1>
+            <p>High-quality downloads from Instagram, YouTube, TikTok, Twitter & more. Fast, free, unlimited potential.</p>
+            
+            <div class="platforms">
+                <div class="platform-icon active" title="Instagram"><i class="fab fa-instagram"></i></div>
+                <div class="platform-icon" title="YouTube"><i class="fab fa-youtube"></i></div>
+                <div class="platform-icon" title="TikTok"><i class="fab fa-tiktok"></i></div>
+                <div class="platform-icon" title="Twitter/X"><i class="fab fa-twitter"></i></div>
+                <div class="platform-icon" title="Facebook"><i class="fab fa-facebook"></i></div>
             </div>
         </div>
 
-        <div class="dark-card" id="resultCard">
-            <div class="res-top">
-                <img src="" class="res-img" id="resThumb" referrerpolicy="no-referrer" onerror="this.style.display='none';">
-                <div style="flex:1">
-                    <h3 id="resTitle" style="font-size:1.4rem; margin-bottom:10px;">Loading...</h3>
-                    <div id="resMeta" style="color:#666;"><i class="fas fa-clock"></i> 00:00</div>
+        <!-- Search -->
+        <div class="search-wrapper">
+            <div class="search-container" id="dropZone">
+                <div class="drop-zone" id="dropOverlay">
+                    <span><i class="fas fa-cloud-upload-alt" style="font-size: 2rem; margin-right: 10px;"></i>Drop URL Here</span>
+                </div>
+                
+                <button class="paste-btn" onclick="pasteFromClipboard()" title="Paste from Clipboard">
+                    <i class="fas fa-paste"></i>
+                </button>
+                
+                <input type="text" 
+                       class="url-input" 
+                       id="urlInput" 
+                       placeholder="Paste video link here..." 
+                       onkeypress="if(event.key==='Enter')fetchVideoInfo()"
+                       onpaste="handlePaste(event)">
+                
+                <button class="fetch-btn" id="fetchBtn" onclick="fetchVideoInfo()">
+                    <i class="fas fa-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Result Card -->
+        <div class="result-card" id="resultCard">
+            <div class="video-header">
+                <img src="" alt="Thumbnail" class="video-thumb" id="videoThumb" onerror="this.style.display='none'">
+                <div class="video-info">
+                    <h3 class="video-title" id="videoTitle">Loading...</h3>
+                    <div class="video-meta">
+                        <span><i class="fas fa-clock"></i> <span id="videoDuration">--:--</span></span>
+                        <span><i class="fas fa-user"></i> <span id="videoAuthor">Unknown</span></span>
+                        <span><i class="fas fa-eye"></i> <span id="videoViews">0</span></span>
+                    </div>
                 </div>
             </div>
-            <div id="formatList"></div>
-        </div>
-
-        <div id="historySection" style="display:none">
-            <div class="section-head">Recent Activity</div>
-            <div class="history-track" id="historyList"></div>
-        </div>
-
-        <div class="section-head">Ecosystem</div>
-        <div class="grid-box" id="relateGrid">
-            <a href="#" class="quick-card"><div class="quick-icon"><i class="fas fa-video"></i></div><span style="font-weight:700">Reels</span></a>
-            <a href="#" class="quick-card"><div class="quick-icon"><i class="fas fa-clock"></i></div><span style="font-weight:700">Stories</span></a>
-            <a href="#" class="quick-card"><div class="quick-icon"><i class="fas fa-image"></i></div><span style="font-weight:700">Posts</span></a>
-            <a href="#" class="quick-card"><div class="quick-icon"><i class="fas fa-tv"></i></div><span style="font-weight:700">IGTV</span></a>
-        </div>
-
-        <div class="section-head">How It Works</div>
-        <div class="step-grid">
-            <div class="step-card">
-                <div class="step-icon"><i class="fas fa-copy"></i></div>
-                <h4>1. Copy Link</h4>
-                <p style="color:#666; margin-top:10px; font-size:0.9rem">Copy the URL of the Instagram Reel or Post.</p>
-            </div>
-            <div class="step-card">
-                <div class="step-icon"><i class="fas fa-paste"></i></div>
-                <h4>2. Paste & Go</h4>
-                <p style="color:#666; margin-top:10px; font-size:0.9rem">Paste the link above and hit the go button.</p>
-            </div>
-            <div class="step-card">
-                <div class="step-icon"><i class="fas fa-download"></i></div>
-                <h4>3. Download</h4>
-                <p style="color:#666; margin-top:10px; font-size:0.9rem">Save the file instantly to your device.</p>
+            <div class="format-grid" id="formatList">
+                <!-- Formats injected here -->
             </div>
         </div>
 
-        <div class="section-head">Questions</div>
-        <div id="faqSection" style="max-width:800px; margin:0 auto">
-            <div class="faq-item" onclick="toggleFaq(this)">
-                <div class="faq-question">Is it free? <i class="fas fa-chevron-down"></i></div>
-                <div class="faq-answer"><p>Yes, for limited use. Login for more.</p></div>
+        <!-- Stats -->
+        <div class="stats-bar" id="statsBar">
+            <div class="stat-item" style="animation-delay: 0.1s">
+                <div class="stat-value" id="statDownloads">0</div>
+                <div class="stat-label">Downloads Today</div>
             </div>
-            <div class="faq-item" onclick="toggleFaq(this)">
-                <div class="faq-question">Where are files saved? <i class="fas fa-chevron-down"></i></div>
-                <div class="faq-answer"><p>They are saved to your device's default 'Downloads' folder.</p></div>
+            <div class="stat-item" style="animation-delay: 0.2s">
+                <div class="stat-value" id="statUsers">0</div>
+                <div class="stat-label">Happy Users</div>
             </div>
-            <div class="faq-item" onclick="toggleFaq(this)">
-                <div class="faq-question">Is it secure? <i class="fas fa-chevron-down"></i></div>
-                <div class="faq-answer"><p>Yes, we do not store any personal data or files.</p></div>
+            <div class="stat-item" style="animation-delay: 0.3s">
+                <div class="stat-value">99.9%</div>
+                <div class="stat-label">Uptime</div>
+            </div>
+        </div>
+
+        <!-- History Section -->
+        <div class="history-section" id="historySection">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <i class="fas fa-history"></i>
+                    Recent Downloads
+                </h2>
+                <button class="theme-toggle" onclick="clearHistory()" title="Clear History">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+            <div class="history-scroll" id="historyList">
+                <!-- History items -->
+            </div>
+        </div>
+
+        <!-- Features -->
+        <div class="features">
+            <div class="feature-card" style="animation-delay: 0.1s">
+                <div class="feature-icon">
+                    <i class="fas fa-rocket"></i>
+                </div>
+                <h3 class="feature-title">Lightning Fast</h3>
+                <p class="feature-desc">Multi-threaded downloading with optimized servers for maximum speed.</p>
+            </div>
+            <div class="feature-card" style="animation-delay: 0.2s">
+                <div class="feature-icon">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <h3 class="feature-title">100% Secure</h3>
+                <p class="feature-desc">No malware, no tracking. Your privacy is our priority. Files auto-delete.</p>
+            </div>
+            <div class="feature-card" style="animation-delay: 0.3s">
+                <div class="feature-icon">
+                    <i class="fas fa-infinity"></i>
+                </div>
+                <h3 class="feature-title">Unlimited</h3>
+                <p class="feature-desc">No daily limits with God Mode. Download as much as you want, when you want.</p>
+            </div>
+            <div class="feature-card" style="animation-delay: 0.4s">
+                <div class="feature-icon">
+                    <i class="fas fa-mobile-alt"></i>
+                </div>
+                <h3 class="feature-title">Any Device</h3>
+                <p class="feature-desc">Works perfectly on mobile, tablet, or desktop. Responsive design everywhere.</p>
             </div>
         </div>
     </div>
 
-    <footer>
-        <div class="footer-grid">
-            <div class="footer-col"><h4 style="color:white; margin-bottom:20px">In.dl</h4><p style="color:#666">The best Instagram Downloader.</p></div>
-            <div class="footer-col"><h4 style="color:white; margin-bottom:20px">Support</h4><a href="about.html" class="footer-link">About</a><a href="contact.html" class="footer-link">Contact</a></div>
-            <div class="footer-col"><h4 style="color:white; margin-bottom:20px">Legal</h4><a href="privacy.html" class="footer-link">Privacy</a><a href="terms.html" class="footer-link">Terms</a></div>
+    <!-- Auth Modal -->
+    <div class="modal" id="authModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="authTitle">Welcome Back</h2>
+                <button class="modal-close" onclick="closeModal('authModal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="authForm" onsubmit="handleAuth(event)">
+                    <div class="form-group">
+                        <label class="form-label">Username or Email</label>
+                        <input type="text" class="form-input" id="authUser" required placeholder="Enter username">
+                    </div>
+                    <div class="form-group" id="emailGroup" style="display:none;">
+                        <label class="form-label">Email Address</label>
+                        <input type="email" class="form-input" id="authEmail" placeholder="you@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <input type="password" class="form-input" id="authPass" required placeholder="••••••••">
+                    </div>
+                    <div class="form-group" id="refGroup" style="display:none;">
+                        <label class="form-label">Referral Code (Optional)</label>
+                        <input type="text" class="form-input" id="authRef" placeholder="Enter code">
+                    </div>
+                    <button type="submit" class="btn-primary" id="authSubmitBtn" style="width:100%;">
+                        Login
+                    </button>
+                </form>
+                <p style="text-align:center; margin-top:20px; color:var(--text-muted);">
+                    <span id="authSwitchText">Don't have an account?</span>
+                    <a href="#" onclick="toggleAuthMode()" style="color:var(--primary); font-weight:600; text-decoration:none;">
+                        <span id="authSwitchAction">Register</span>
+                    </a>
+                </p>
+            </div>
         </div>
-        <div style="text-align:center; color:#444; margin-top:50px; border-top:1px solid #111; padding-top:20px">&copy; 2026 In.dl Downloader By Ashish.</div>
-    </footer>
+    </div>
+
+    <!-- Pricing Modal -->
+    <div class="modal large" id="pricingModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Choose Your Plan</h2>
+                <button class="modal-close" onclick="closeModal('pricingModal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="pricing-grid">
+                    <div class="pricing-card">
+                        <div class="plan-name">Starter</div>
+                        <div class="plan-price">Free</div>
+                        <ul class="plan-features">
+                            <li><i class="fas fa-check"></i> 15 Credits/Day</li>
+                            <li><i class="fas fa-check"></i> Standard Quality</li>
+                            <li><i class="fas fa-check"></i> Basic Support</li>
+                            <li><i class="fas fa-times" style="color:var(--danger)"></i> No Priority</li>
+                        </ul>
+                        <button class="btn-primary" style="background:#333; width:100%;" disabled>Current Plan</button>
+                    </div>
+                    
+                    <div class="pricing-card">
+                        <div class="plan-name">Booster</div>
+                        <div class="plan-price">₹25<span>/mo</span></div>
+                        <ul class="plan-features">
+                            <li><i class="fas fa-check"></i> 50 Credits</li>
+                            <li><i class="fas fa-check"></i> HD Quality</li>
+                            <li><i class="fas fa-check"></i> Fast Processing</li>
+                            <li><i class="fas fa-check"></i> Email Support</li>
+                        </ul>
+                        <button class="btn-primary" style="width:100%;" onclick="startPayment('Booster', 25)">Get Started</button>
+                    </div>
+                    
+                    <div class="pricing-card featured">
+                        <div class="best-badge">Best Value</div>
+                        <div class="plan-name" style="color:var(--gold)">God Mode</div>
+                        <div class="plan-price" style="color:var(--gold)">₹70<span>/mo</span></div>
+                        <ul class="plan-features">
+                            <li><i class="fas fa-check" style="color:var(--gold)"></i> Unlimited Credits</li>
+                            <li><i class="fas fa-check" style="color:var(--gold)"></i> 4K Quality</li>
+                            <li><i class="fas fa-check" style="color:var(--gold)"></i> Priority Queue</li>
+                            <li><i class="fas fa-check" style="color:var(--gold)"></i> 24/7 Support</li>
+                            <li><i class="fas fa-check" style="color:var(--gold)"></i> Early Access</li>
+                        </ul>
+                        <button class="btn-primary" style="background:var(--gold); color:#000; width:100%;" onclick="startPayment('God Mode', 70)">Go Unlimited</button>
+                    </div>
+                </div>
+                
+                <div style="text-align:center; margin-top:30px; padding-top:20px; border-top:1px solid var(--border);">
+                    <p style="color:var(--text-muted); margin-bottom:15px;">Or watch an ad for free credits</p>
+                    <button class="theme-toggle" onclick="watchAd()" style="padding:15px 30px; height:auto; width:auto; border-radius:50px;">
+                        <i class="fas fa-play-circle" style="margin-right:10px;"></i>
+                        Watch Ad (+1-3 Credits)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Modal -->
+    <div class="modal" id="paymentModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Complete Payment</h2>
+                <button class="modal-close" onclick="closeModal('paymentModal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="paymentStep1">
+                    <div style="text-align:center; margin-bottom:30px;">
+                        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Crect fill='%23fff' width='200' height='200'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' font-family='Arial' font-size='14'%3EQR Code%3C/text%3E%3C/svg%3E" 
+                             alt="QR Code" 
+                             style="border-radius:var(--radius-md); margin-bottom:20px; max-width:250px; width:100%;">
+                        
+                        <div style="background:var(--bg-glass); padding:15px; border-radius:var(--radius-md); margin-bottom:20px; border:1px solid var(--border);">
+                            <div style="font-family:monospace; font-size:1.2rem; color:var(--gold);" id="upiId">pay@indl</div>
+                        </div>
+                        
+                        <p style="color:var(--text-secondary); margin-bottom:20px;">
+                            Scan with any UPI app to complete payment
+                        </p>
+                    </div>
+                    
+                    <button class="btn-primary" style="width:100%;" onclick="showPaymentProof()">
+                        I've Made the Payment
+                    </button>
+                </div>
+                
+                <div id="paymentStep2" style="display:none;">
+                    <form onsubmit="submitPayment(event)">
+                        <div class="form-group">
+                            <label class="form-label">Upload Payment Screenshot</label>
+                            <input type="file" class="form-input" id="paymentProof" accept="image/*" required>
+                        </div>
+                        <button type="submit" class="btn-primary" style="width:100%;">
+                            Verify Payment
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
-        const API_URL = "/api"; 
-        let authToken = localStorage.getItem('token');
+        // Global State
+        const API = '/api';
+        let authToken = localStorage.getItem('indl_token');
+        let guestSession = localStorage.getItem('indl_session');
+        let currentUser = null;
         let isLoginMode = true;
+        let activeDownloads = new Map();
+        let selectedPlan = null;
 
-        window.onload = () => { 
-            spawnParticles(); 
-            checkStatus(); 
-            loadHistory(); 
+        // Generate unique session ID for guests if not exists
+        if (!guestSession) {
+            guestSession = 'gst_' + Math.random().toString(36).substring(2, 15);
+            localStorage.setItem('indl_session', guestSession);
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuth();
+            loadHistory();
+            setupDragDrop();
+            loadTheme();
             
-            document.getElementById('urlInput').addEventListener('keypress', function (e) { 
-                if (e.key === 'Enter') fetchInfo(); 
-            }); 
-            
-            window.onclick = function(e) { 
-                if (!e.target.closest('.profile-wrap')) { 
-                    const menu = document.querySelector('.dropdown-menu'); 
-                    const btn = document.querySelector('.profile-btn'); 
-                    if (menu && menu.classList.contains('show')) { 
-                        menu.classList.remove('show'); 
-                        if(btn) btn.classList.remove('active'); 
-                    } 
-                } 
-            } 
-        };
-        
-        function checkLoginAndOpenPlan() {
-            if(!authToken) { 
-                alert("Please Login First!");
-                openModal('authModal'); 
-                return; 
-            }
-            openModal('planModal');
+            // Platform selector
+            document.querySelectorAll('.platform-icon').forEach(icon => {
+                icon.addEventListener('click', function() {
+                    document.querySelectorAll('.platform-icon').forEach(i => i.classList.remove('active'));
+                    this.classList.add('active');
+                });
+            });
+        });
+
+        // Theme Toggle
+        function toggleTheme() {
+            const html = document.documentElement;
+            const current = html.getAttribute('data-theme');
+            const next = current === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', next);
+            localStorage.setItem('indl_theme', next);
+            document.getElementById('themeIcon').className = next === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
         }
 
-        function toggleProfile(e) { 
-            e.stopPropagation(); 
-            const menu = document.querySelector('.dropdown-menu'); 
-            const btn = document.querySelector('.profile-btn'); 
-            if(menu) { 
-                menu.classList.toggle('show'); 
-                if(btn) btn.classList.toggle('active'); 
-            } 
+        function loadTheme() {
+            const saved = localStorage.getItem('indl_theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', saved);
+            document.getElementById('themeIcon').className = saved === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
         }
 
-        function spawnParticles() { 
-            const container = document.getElementById('voidStream'); 
-            const icons = ['fa-camera', 'fa-image', 'fa-video', 'fa-heart', 'fa-comment']; 
-            for(let i=0; i<20; i++) { 
-                let el = document.createElement('i'); 
-                el.className = `fas ${icons[Math.floor(Math.random()*icons.length)]} stream-icon`; 
-                el.style.left = Math.random() * 100 + '%'; 
-                el.style.animationDuration = (Math.random() * 5 + 10) + 's'; 
-                el.style.animationDelay = Math.random() * 5 + 's'; 
-                container.appendChild(el); 
-            } 
-        }
-
-        function toggleFaq(el) { el.classList.toggle('active'); }
-        function openModal(id) { document.getElementById(id).style.display = 'flex'; }
-        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-        
-        function openPaymentModal(planName) { 
-            if(!authToken) { alert("Please Login First"); openModal('authModal'); return; } 
-            closeModal('planModal'); 
-            document.getElementById('selectedPlanName').value = planName; 
-            showScanStep(); 
-            openModal('paymentModal'); 
-        }
-
-        function showUploadStep() { document.getElementById('stepScan').style.display = 'none'; document.getElementById('stepUpload').style.display = 'block'; }
-        function showScanStep() { document.getElementById('stepScan').style.display = 'block'; document.getElementById('stepUpload').style.display = 'none'; }
-        function copyUPI() { const txt = document.getElementById('upiId').innerText; navigator.clipboard.writeText(txt); alert("UPI ID Copied: " + txt); }
-
-        async function submitPayment(e) { 
-            e.preventDefault(); 
-            const plan = document.getElementById('selectedPlanName').value; 
-            const file = document.getElementById('proofFile').files[0]; 
-            const formData = new FormData(); 
-            formData.append('plan_name', plan); 
-            formData.append('screenshot', file); 
-            try { 
-                const res = await fetch(`${API_URL}/payment/request`, { method: 'POST', headers: { 'Authorization': `Bearer ${authToken}` }, body: formData }); 
-                if(res.ok) { closeModal('paymentModal'); showScanStep(); alert("Submitted! Please wait for admin approval."); } 
-                else alert("Upload Failed"); 
-            } catch(e) { alert("Error connecting to server"); } 
-        }
-
-        async function checkStatus() { 
-            try { 
-                const res = await fetch(`${API_URL}/status`, { headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {} }); 
-                const d = await res.json(); 
-
-                // NEW FEATURE: MAINTENANCE CHECK (COMMENTED OUT TO PREVENT LOCKOUT)
-                /*
-                if(d.maintenance && !d.is_admin) {
-                    document.getElementById('maintOverlay').style.display = 'flex';
-                    return; // Stop execution to block access
-                }
-                */
-
-                // NEW FEATURE: ANNOUNCEMENT BAR
-                if(d.announcement) {
-                    const bar = document.getElementById('announcementBar');
-                    bar.innerText = d.announcement;
-                    bar.style.display = 'block';
+        // Auth Functions
+        async function checkAuth() {
+            try {
+                const headers = {
+                    'X-Guest-ID': guestSession,
+                    'X-Fingerprint': getFingerprint()
+                };
+                if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+                
+                const res = await fetch(`${API}/auth/check`, { headers });
+                const data = await res.json();
+                
+                if (data.is_logged_in) {
+                    currentUser = data;
+                    document.getElementById('dropdownUsername').textContent = data.username;
+                    document.getElementById('dropdownPlan').textContent = data.plan;
+                    document.getElementById('authBtn').textContent = 'Logout';
+                    document.getElementById('authBtn').onclick = logout;
+                    
+                    if (data.is_admin) {
+                        document.getElementById('adminItem').style.display = 'flex';
+                        document.getElementById('adminItem').onclick = () => window.location.href = '/admin';
+                    }
+                    
+                    if (data.can_checkin) {
+                        document.getElementById('dailyCheckinItem').style.display = 'flex';
+                    }
+                    
+                    document.getElementById('creditsCount').textContent = data.tokens === 999999 ? '∞' : data.tokens;
                 } else {
-                    document.getElementById('announcementBar').style.display = 'none';
+                    document.getElementById('creditsCount').textContent = data.tokens;
+                }
+                
+                if (data.announcement) {
+                    showToast(data.announcement, 'info');
+                }
+                
+                if (data.maintenance && !data.is_admin) {
+                    document.body.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100vh;flex-direction:column;"><i class="fas fa-tools" style="font-size:3rem;color:var(--primary);margin-bottom:20px;"></i><h1>Under Maintenance</h1><p>We\'ll be back shortly!</p></div>';
+                }
+                
+            } catch (e) {
+                console.error('Auth check failed:', e);
+            }
+        }
+
+        function getFingerprint() {
+            // Simple fingerprint based on user agent and screen size
+            return btoa(navigator.userAgent + screen.width + screen.height).substring(0, 16);
+        }
+
+        function openAuth() {
+            if (currentUser) return;
+            document.getElementById('authModal').classList.add('active');
+        }
+
+        function toggleAuthMode() {
+            isLoginMode = !isLoginMode;
+            document.getElementById('authTitle').textContent = isLoginMode ? 'Welcome Back' : 'Create Account';
+            document.getElementById('authSubmitBtn').textContent = isLoginMode ? 'Login' : 'Register';
+            document.getElementById('authSwitchText').textContent = isLoginMode ? "Don't have an account?" : "Already have an account?";
+            document.getElementById('authSwitchAction').textContent = isLoginMode ? 'Register' : 'Login';
+            document.getElementById('emailGroup').style.display = isLoginMode ? 'none' : 'block';
+            document.getElementById('refGroup').style.display = isLoginMode ? 'none' : 'block';
+        }
+
+        async function handleAuth(e) {
+            e.preventDefault();
+            const btn = document.getElementById('authSubmitBtn');
+            btn.disabled = true;
+            const originalText = btn.textContent;
+            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Processing...';
+
+            try {
+                const endpoint = isLoginMode ? 'login' : 'register';
+                const payload = {
+                    username: document.getElementById('authUser').value,
+                    password: document.getElementById('authPass').value
+                };
+                
+                if (!isLoginMode) {
+                    payload.email = document.getElementById('authEmail').value;
+                    payload.referral_code = document.getElementById('authRef').value;
                 }
 
-                document.getElementById('tokenCount').innerText = `${d.tokens} / ${d.is_logged_in ? '∞' : 5}`; 
-                const userHtml = `<div class="profile-wrap"><div class="profile-btn" onclick="toggleProfile(event)"><i class="fas fa-user${d.is_logged_in ? '-astronaut' : ''}"></i></div><div class="dropdown-menu"><div class="dd-user">${d.is_logged_in ? d.username : 'Guest User'}</div><div class="dd-role">${d.plan}</div>${d.is_admin ? '<a href="admin.html" class="dd-link"><i class="fas fa-shield-alt"></i> Admin Panel</a>' : ''}<button class="liquid-btn" style="width:100%; font-size:0.9rem; padding:8px; margin-top:5px" onclick="${d.is_logged_in ? 'doLogout()' : "openModal('authModal')" }">${d.is_logged_in ? 'LOGOUT' : 'LOGIN'}</button></div></div>`; 
-                document.getElementById('userArea').innerHTML = userHtml; 
-            } catch(e){} 
-        }
+                const res = await fetch(`${API}/auth/${endpoint}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
 
-        async function fetchInfo() { 
-            const url = document.getElementById('urlInput').value; 
-            const btn = document.getElementById('searchBtn'); 
-            if(!url) return; 
-            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i>'; 
-            try { 
-                const res = await fetch(`${API_URL}/info`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ url }) }); 
-                const data = await res.json(); 
-                if(data.error) throw new Error("Not Found"); 
-                
-                addToHistory(data, url); 
-                
-                const thumb = document.getElementById('resThumb');
-                thumb.src = data.thumbnail; 
-                thumb.style.display = 'block'; 
-                
-                document.getElementById('resTitle').innerText = data.title; 
-                document.getElementById('resMeta').innerHTML = `<i class="fas fa-clock"></i> ${data.duration}`; 
-                document.getElementById('formatList').innerHTML = data.formats.map(fmt => `<div class="fmt-item"><div><div style="font-weight:bold; font-size:1.1rem">${fmt.quality}</div><div style="font-size:0.8rem; color:#666">${fmt.ext.toUpperCase()} • ${fmt.size}</div></div><button class="dl-mini-btn" onclick="startDownload('${url}', '${fmt.id}', this)">GET</button></div>`).join(''); 
-                document.getElementById('resultCard').style.display = 'block'; 
-            } catch(e) { alert("Error: " + e.message); } 
-            finally { btn.innerHTML = '<i class="fas fa-arrow-right"></i>'; } 
-        }
+                const data = await res.json();
 
-        async function startDownload(url, fmtId, btn) { 
-            const orgHtml = btn.innerHTML; 
-            btn.disabled = true; 
-            btn.innerHTML = '...'; 
-            const headers = { 'Content-Type': 'application/json' }; 
-            if(authToken) headers['Authorization'] = `Bearer ${authToken}`; 
-            try { 
-                const res = await fetch(`${API_URL}/download`, { method: 'POST', headers, body: JSON.stringify({ url, format_id: fmtId }) }); 
-                const data = await res.json(); 
-                
-                // NEW FEATURE: Handle Banned/Maintenance Errors
-                if(res.status === 403 && data.error === "BANNED") {
-                    alert(data.message);
-                    btn.innerHTML = orgHtml; btn.disabled = false;
-                    return;
+                if (res.ok) {
+                    if (isLoginMode) {
+                        localStorage.setItem('indl_token', data.token);
+                        authToken = data.token;
+                        closeModal('authModal');
+                        checkAuth();
+                        showToast('Welcome back!', 'success');
+                        confetti();
+                    } else {
+                        showToast('Registration successful! Please login.', 'success');
+                        toggleAuthMode();
+                    }
+                } else {
+                    showToast(data.error || 'Authentication failed', 'error');
                 }
-                if(res.status === 503) {
-                    alert(data.message);
-                    btn.innerHTML = orgHtml; btn.disabled = false;
-                    return;
-                }
+            } catch (e) {
+                showToast('Network error. Please try again.', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        }
 
-                if(res.status === 403) { 
-                    if(authToken) { alert("Daily Limit Reached! Buy more credits."); openModal('planModal'); } 
-                    else { alert("Guest Limit Reached! Login for more."); openModal('authModal'); } 
-                    btn.innerHTML = orgHtml; btn.disabled = false; return; 
-                } 
+        function logout() {
+            localStorage.removeItem('indl_token');
+            authToken = null;
+            currentUser = null;
+            location.reload();
+        }
+
+        async function doCheckin() {
+            try {
+                const res = await fetch(`${API}/auth/daily-checkin`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await res.json();
                 
-                checkStatus(); 
-                const timer = setInterval(async () => { 
-                    const s = await fetch(`${API_URL}/progress/${data.job_id}`).then(r => r.json()); 
-                    if(s.status === 'downloading') btn.innerText = s.percent + "%"; 
-                    else if(s.status === 'completed') { 
-                        clearInterval(timer); 
-                        btn.innerHTML = "DONE"; 
-                        openModal('successModal'); 
-                        window.location.href = `${API_URL}/file/${data.job_id}`; 
-                        setTimeout(() => { btn.innerHTML = orgHtml; btn.disabled = false; }, 3000); 
-                    } 
-                }, 250); 
-            } catch(e) { btn.innerHTML = "ERR"; btn.disabled = false; } 
+                if (res.ok) {
+                    showToast(`Daily check-in: +${data.reward} credits!`, 'success');
+                    document.getElementById('dailyCheckinItem').style.display = 'none';
+                    confetti();
+                    checkAuth();
+                } else {
+                    showToast(data.error, 'error');
+                }
+            } catch (e) {
+                showToast('Failed to claim reward', 'error');
+            }
         }
 
-        function addToHistory(d, u) { 
-            let h = JSON.parse(localStorage.getItem('h')||'[]'); 
-            h = h.filter(x => x.u !== u); 
-            h.unshift({ t: d.title, i: d.thumbnail, u: u }); 
-            if(h.length > 5) h.pop(); 
-            localStorage.setItem('h', JSON.stringify(h)); 
-            loadHistory(); 
+        // Video Download Functions
+        async function fetchVideoInfo() {
+            const url = document.getElementById('urlInput').value.trim();
+            if (!url) {
+                showToast('Please enter a URL', 'warning');
+                return;
+            }
+
+            const btn = document.getElementById('fetchBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i>';
+
+            try {
+                const res = await fetch(`${API}/download/info`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-Guest-ID': guestSession,
+                        'X-Fingerprint': getFingerprint()
+                    },
+                    body: JSON.stringify({ url })
+                });
+
+                const data = await res.json();
+
+                if (res.ok && !data.error) {
+                    displayVideoInfo(data, url);
+                    addToHistory(data, url);
+                } else {
+                    showToast(data.error || 'Failed to fetch video info', 'error');
+                }
+            } catch (e) {
+                showToast('Network error. Please try again.', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-arrow-right"></i>';
+            }
         }
 
-        function loadHistory() { 
-            const h = JSON.parse(localStorage.getItem('h')||'[]'); 
-            const el = document.getElementById('historyList'); 
-            document.getElementById('historySection').style.display = h.length ? 'block' : 'none'; 
-            el.innerHTML = h.map(x => `<div class="hist-card" onclick="document.getElementById('urlInput').value='${x.u}'; fetchInfo()"><img src="${x.i}" class="hist-img" referrerpolicy="no-referrer"><div style="font-size:0.8rem; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">${x.t}</div></div>`).join(''); 
+        function displayVideoInfo(data, url) {
+            const card = document.getElementById('resultCard');
+            card.classList.add('active');
+            
+            document.getElementById('videoThumb').src = data.thumbnail || '';
+            document.getElementById('videoThumb').style.display = data.thumbnail ? 'block' : 'none';
+            document.getElementById('videoTitle').textContent = data.title || 'Unknown Title';
+            document.getElementById('videoDuration').textContent = data.duration || '--:--';
+            document.getElementById('videoAuthor').textContent = data.uploader || 'Unknown';
+            document.getElementById('videoViews').textContent = formatNumber(data.view_count || 0);
+
+            const formatList = document.getElementById('formatList');
+            formatList.innerHTML = data.formats.map((fmt, idx) => `
+                <div class="format-item" style="animation: fadeInUp 0.3s ease ${idx * 0.05}s both;">
+                    <div class="format-details">
+                        <div class="format-quality">${fmt.quality}</div>
+                        <div class="format-specs">${fmt.type.toUpperCase()} • ${fmt.size}</div>
+                    </div>
+                    <button class="download-btn" onclick="startDownload('${url}', '${fmt.id}', this)" id="btn-${fmt.id}">
+                        <div class="progress-ring"></div>
+                        <span>Download</span>
+                    </button>
+                </div>
+            `).join('');
+
+            // Smooth scroll to result
+            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
 
-        async function pasteFromClipboard() { try { document.getElementById('urlInput').value = await navigator.clipboard.readText(); } catch(e){} }
-        
-        function toggleAuthMode() { 
-            isLoginMode = !isLoginMode; 
-            const title = document.getElementById('authTitle'); 
-            const sub = document.getElementById('authSub'); 
-            const btn = document.getElementById('authSubmitBtn'); 
-            const link = document.getElementById('authSwitchText'); 
-            const emailInp = document.getElementById('emailInput'); 
-            if(isLoginMode) { 
-                title.innerText = "Login"; sub.innerText = "Login to remove the 5-download limit."; btn.innerText = "LOGIN"; 
-                link.innerHTML = 'New User? <span style="color:var(--primary)">Register Here</span>'; emailInp.style.display = 'none'; 
-            } else { 
-                title.innerText = "Create Account"; sub.innerText = "Sign up to unlock more features."; btn.innerText = "SIGN UP"; 
-                link.innerHTML = 'Already have an account? <span style="color:var(--primary)">Login Here</span>'; emailInp.style.display = 'block'; 
-            } 
+        async function startDownload(url, formatId, btn) {
+            if (btn.classList.contains('loading')) return;
+            
+            btn.classList.add('loading');
+            const span = btn.querySelector('span');
+            span.textContent = 'Starting...';
+
+            try {
+                const res = await fetch(`${API}/download/start`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': authToken ? `Bearer ${authToken}` : '',
+                        'X-Guest-ID': guestSession,
+                        'X-Fingerprint': getFingerprint()
+                    },
+                    body: JSON.stringify({ url, format_id: formatId })
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    trackDownloadProgress(data.job_id, btn, span);
+                } else {
+                    handleDownloadError(data, btn, span);
+                }
+            } catch (e) {
+                showToast('Failed to start download', 'error');
+                btn.classList.remove('loading');
+                span.textContent = 'Download';
+            }
         }
 
-        function doLogout() { localStorage.removeItem('token'); authToken=null; location.reload(); }
-        
-        document.getElementById('authForm').onsubmit = async (e) => { 
-            e.preventDefault(); 
-            const u = document.getElementById('userInput').value; 
-            const p = document.getElementById('passInput').value; 
-            const email = document.getElementById('emailInput').value; 
-            const ep = isLoginMode ? 'login' : 'register'; 
-            const body = { username: u, password: p }; 
-            if(!isLoginMode) body.email = email; 
-            const res = await fetch(`${API_URL}/${ep}`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) }); 
-            const d = await res.json(); 
-            if(res.ok && isLoginMode) { localStorage.setItem('token', d.token); authToken=d.token; closeModal('authModal'); checkStatus(); } 
-            else if(res.ok) { alert("Done! Login now."); toggleAuthMode(); } 
-            else document.getElementById('authMsg').innerText = d.message; 
-        };
+        function trackDownloadProgress(jobId, btn, span) {
+            const progressInterval = setInterval(async () => {
+                try {
+                    // Check if cancelled
+                    if (!btn.classList.contains('loading')) {
+                        clearInterval(progressInterval);
+                        return;
+                    }
+
+                    const res = await fetch(`${API}/download/progress/${jobId}`);
+                    const data = await res.json();
+
+                    if (data.status === 'downloading') {
+                        span.textContent = `${data.percent || 0}%`;
+                    } else if (data.status === 'completed') {
+                        clearInterval(progressInterval);
+                        span.textContent = 'Done!';
+                        showToast('Download complete!', 'success');
+                        
+                        // Trigger file download
+                        window.location.href = `${API}/download/file/${jobId}`;
+                        
+                        setTimeout(() => {
+                            btn.classList.remove('loading');
+                            span.textContent = 'Download';
+                        }, 3000);
+                        
+                        confetti();
+                        checkAuth(); // Update credits
+                    } else if (data.status === 'error') {
+                        clearInterval(progressInterval);
+                        throw new Error(data.error);
+                    }
+                } catch (e) {
+                    clearInterval(progressInterval);
+                    showToast('Download failed: ' + e.message, 'error');
+                    btn.classList.remove('loading');
+                    span.textContent = 'Retry';
+                }
+            }, 500);
+        }
+
+        function handleDownloadError(data, btn, span) {
+            btn.classList.remove('loading');
+            
+            if (data.error === 'LIMIT_REACHED') {
+                span.textContent = 'No Credits';
+                showToast(data.message, 'warning');
+                setTimeout(() => openPricing(), 1000);
+            } else if (data.error === 'BANNED') {
+                span.textContent = 'Banned';
+                showToast('Your access has been restricted', 'error');
+            } else {
+                span.textContent = 'Failed';
+                showToast(data.message || 'Download failed', 'error');
+                setTimeout(() => span.textContent = 'Download', 2000);
+            }
+        }
+
+        // Payment & Credits
+        function openPricing() {
+            document.getElementById('pricingModal').classList.add('active');
+        }
+
+        function startPayment(plan, amount) {
+            selectedPlan = { name: plan, amount: amount };
+            closeModal('pricingModal');
+            document.getElementById('paymentModal').classList.add('active');
+            document.getElementById('paymentStep1').style.display = 'block';
+            document.getElementById('paymentStep2').style.display = 'none';
+        }
+
+        function showPaymentProof() {
+            if (!currentUser) {
+                showToast('Please login first', 'warning');
+                closeModal('paymentModal');
+                openAuth();
+                return;
+            }
+            document.getElementById('paymentStep1').style.display = 'none';
+            document.getElementById('paymentStep2').style.display = 'block';
+        }
+
+        async function submitPayment(e) {
+            e.preventDefault();
+            const file = document.getElementById('paymentProof').files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('plan_name', selectedPlan.name);
+            formData.append('amount', selectedPlan.amount);
+            formData.append('screenshot', file);
+
+            try {
+                const res = await fetch(`${API}/payment/request`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${authToken}` },
+                    body: formData
+                });
+
+                if (res.ok) {
+                    closeModal('paymentModal');
+                    showToast('Payment submitted for verification!', 'success');
+                    document.getElementById('paymentProof').value = '';
+                } else {
+                    showToast('Failed to submit payment', 'error');
+                }
+            } catch (e) {
+                showToast('Network error', 'error');
+            }
+        }
+
+        async function watchAd() {
+            try {
+                const res = await fetch(`${API}/credits/watch-ad`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': authToken ? `Bearer ${authToken}` : '',
+                        'X-Guest-ID': guestSession
+                    }
+                });
+                const data = await res.json();
+                
+                if (res.ok) {
+                    showToast(data.message, 'success');
+                    checkAuth();
+                    confetti();
+                } else {
+                    showToast(data.error || 'Please wait before watching another ad', 'warning');
+                }
+            } catch (e) {
+                showToast('Failed to credit account', 'error');
+            }
+        }
+
+        // History Management
+        function addToHistory(data, url) {
+            let history = JSON.parse(localStorage.getItem('indl_history') || '[]');
+            const item = {
+                title: data.title,
+                thumbnail: data.thumbnail,
+                url: url,
+                date: new Date().toISOString(),
+                platform: data.platform || 'unknown'
+            };
+            
+            // Remove duplicates
+            history = history.filter(h => h.url !== url);
+            history.unshift(item);
+            if (history.length > 10) history.pop();
+            
+            localStorage.setItem('indl_history', JSON.stringify(history));
+            loadHistory();
+        }
+
+        function loadHistory() {
+            const history = JSON.parse(localStorage.getItem('indl_history') || '[]');
+            const section = document.getElementById('historySection');
+            const list = document.getElementById('historyList');
+            
+            if (history.length === 0) {
+                section.classList.remove('visible');
+                return;
+            }
+            
+            section.classList.add('visible');
+            list.innerHTML = history.map(item => `
+                <div class="history-item" onclick="document.getElementById('urlInput').value='${item.url}'; fetchVideoInfo();">
+                    <img src="${item.thumbnail}" class="history-thumb" onerror="this.src=''" alt="">
+                    <div class="history-info">
+                        <div class="history-title">${item.title}</div>
+                        <div class="history-date">${formatDate(item.date)}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function clearHistory() {
+            localStorage.removeItem('indl_history');
+            loadHistory();
+            showToast('History cleared', 'success');
+        }
+
+        // Utilities
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('active');
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            const icons = {
+                success: 'fa-check-circle',
+                error: 'fa-times-circle',
+                warning: 'fa-exclamation-triangle',
+                info: 'fa-info-circle'
+            };
+            
+            toast.innerHTML = `
+                <i class="fas ${icons[type]} toast-icon"></i>
+                <div>${message}</div>
+            `;
+            
+            toast.onclick = () => toast.remove();
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => toast.remove(), 300);
+            }, 5000);
+        }
+
+        function pasteFromClipboard() {
+            navigator.clipboard.readText().then(text => {
+                document.getElementById('urlInput').value = text;
+                fetchVideoInfo();
+            }).catch(() => {
+                showToast('Unable to access clipboard', 'error');
+            });
+        }
+
+        function handlePaste(e) {
+            setTimeout(() => fetchVideoInfo(), 100);
+        }
+
+        function setupDragDrop() {
+            const zone = document.getElementById('dropZone');
+            const overlay = document.getElementById('dropOverlay');
+            
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                zone.addEventListener(eventName, preventDefaults, false);
+            });
+            
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
+            ['dragenter', 'dragover'].forEach(eventName => {
+                zone.addEventListener(eventName, () => overlay.classList.add('active'), false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                zone.addEventListener(eventName, () => overlay.classList.remove('active'), false);
+            });
+            
+            zone.addEventListener('drop', (e) => {
+                const text = e.dataTransfer.getData('text');
+                if (text) {
+                    document.getElementById('urlInput').value = text;
+                    fetchVideoInfo();
+                }
+            });
+        }
+
+        function toggleUserMenu(e) {
+            e.stopPropagation();
+            document.getElementById('userDropdown').classList.toggle('active');
+            document.getElementById('userAvatar').classList.toggle('active');
+        }
+
+        window.onclick = function(e) {
+            if (!e.target.closest('.user-menu')) {
+                document.getElementById('userDropdown').classList.remove('active');
+                document.getElementById('userAvatar').classList.remove('active');
+            }
+        }
+
+        function formatNumber(num) {
+            if (num >= 1000000) return (num/1000000).toFixed(1) + 'M';
+            if (num >= 1000) return (num/1000).toFixed(1) + 'K';
+            return num.toString();
+        }
+
+        function formatDate(dateStr) {
+            const date = new Date(dateStr);
+            const now = new Date();
+            const diff = (now - date) / 1000;
+            
+            if (diff < 60) return 'Just now';
+            if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+            if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+            return date.toLocaleDateString();
+        }
+
+        // Confetti Effect
+        function confetti() {
+            const canvas = document.getElementById('confetti-canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            const pieces = [];
+            const colors = ['#d62976', '#00d4ff', '#ffd700', '#00ff88', '#ff0033'];
+            
+            for (let i = 0; i < 100; i++) {
+                pieces.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height - canvas.height,
+                    size: Math.random() * 10 + 5,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    speed: Math.random() * 3 + 2,
+                    angle: Math.random() * Math.PI * 2,
+                    rotation: Math.random() * 0.2 - 0.1
+                });
+            }
+            
+            let animationId;
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                pieces.forEach((p, i) => {
+                    p.y += p.speed;
+                    p.angle += p.rotation;
+                    p.x += Math.sin(p.angle) * 2;
+                    
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate(p.angle);
+                    ctx.fillStyle = p.color;
+                    ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size);
+                    ctx.restore();
+                    
+                    if (p.y > canvas.height) pieces.splice(i, 1);
+                });
+                
+                if (pieces.length > 0) {
+                    animationId = requestAnimationFrame(animate);
+                } else {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }
+            }
+            
+            animate();
+            setTimeout(() => cancelAnimationFrame(animationId), 5000);
+        }
+
+        // Placeholder functions for missing features
+        function openHistory() {
+            showToast('Server-side history loading...', 'info');
+            // Would fetch from /api/download/history
+        }
+
+        function openTickets() {
+            showToast('Support ticket system coming soon', 'info');
+        }
     </script>
 </body>
-
 </html>
