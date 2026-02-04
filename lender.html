@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>In.dl - Instagram & Reels Downloader</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root { --bg-deep: #000000; --primary: #d62976; --glass: rgba(20, 20, 20, 0.9); --border: rgba(255, 255, 255, 0.15); --text-main: #ffffff; --text-dim: #888; --font: 'Segoe UI', Roboto, sans-serif; --gold: #ffd700; --success: #00ff88; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: var(--font); }
+        body { background-color: var(--bg-deep); background-image: radial-gradient(circle at 50% 50%, #111 0%, #000 100%); color: var(--text-main); min-height: 100vh; overflow-x: hidden; }
+        
+        .void-stream { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; overflow: hidden; pointer-events: none; }
+        .stream-icon { position: absolute; color: rgba(255, 255, 255, 0.08); font-size: 2.5rem; animation: floatRise linear infinite; text-shadow: 0 0 10px rgba(255, 255, 255, 0.05); }
+        @keyframes floatRise { 0% { transform: translateY(110vh) scale(0.8) rotate(0deg); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(-10vh) scale(1.5) rotate(360deg); opacity: 0; } }
+        
+        #announcementBar { background: var(--primary); color: white; text-align: center; padding: 8px; font-weight: bold; font-size: 0.9rem; display: none; z-index: 200; position: relative; }
+        #maintOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 9999; display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+
+        header { background: rgba(0,0,0,0.8); backdrop-filter: blur(20px); padding: 20px 0; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; }
+        .nav-container { max-width: 1200px; margin: 0 auto; padding: 0 25px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+        .logo { font-size: 1.8rem; font-weight: 900; letter-spacing: -1px; display: flex; align-items: center; gap: 12px; text-shadow: 0 0 20px var(--primary-glow); }
+        .logo i { color: var(--primary); filter: drop-shadow(0 0 10px var(--primary)); }
+        
+        .user-nav { display: flex; gap: 20px; align-items: center; }
+        .profile-wrap { position: relative; display: inline-block; }
+        .profile-btn { width: 45px; height: 45px; border-radius: 50%; background: rgba(255,255,255,0.05); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.3s; color: white; font-size: 1.2rem; user-select: none; }
+        .profile-btn:hover, .profile-btn.active { border-color: var(--primary); background: var(--glass); box-shadow: 0 0 15px var(--primary-glow); }
+        .dropdown-menu { position: absolute; right: 0; top: 120%; width: 220px; background: #0a0a0a; border: 1px solid #333; border-radius: 15px; padding: 20px; display: none; flex-direction: column; gap: 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); z-index: 1000; text-align: center; }
+        .dropdown-menu.show { display: flex; animation: slideUp 0.3s ease; }
+        .dd-user { font-weight: 900; font-size: 1.2rem; color: white; margin-bottom: 2px; }
+        .dd-role { font-size: 0.8rem; color: #888; background: #222; padding: 4px 10px; border-radius: 50px; display: inline-block; margin-bottom: 15px; border: 1px solid #333; }
+        .dd-link { display: block; padding: 8px; color: #aaa; text-decoration: none; font-size: 0.9rem; transition: 0.2s; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .dd-link:hover { background: #222; color: white; }
+        
+        .token-pill { background: rgba(255,255,255,0.08); border: 1px solid var(--border); padding: 8px 16px; border-radius: 50px; font-size: 0.9rem; font-weight: 600; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: 0.3s; white-space: nowrap; }
+        .token-pill:hover { background: rgba(255,255,255,0.15); border-color: var(--primary); transform: scale(1.05); }
+        .token-pill i { color: gold; animation: spinCoin 4s infinite linear; }
+        @keyframes spinCoin { 100% { transform: rotateY(360deg); } }
+        
+        .liquid-btn { position: relative; overflow: hidden; background: var(--primary); color: white; border: none; padding: 10px 25px; border-radius: 50px; font-weight: 700; cursor: pointer; box-shadow: 0 0 20px var(--primary-glow); transition: 0.3s; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; }
+        .liquid-btn:hover { transform: scale(1.05); box-shadow: 0 0 40px var(--primary-glow); }
+        .liquid-btn:disabled { background: #555; box-shadow: none; cursor: not-allowed; opacity: 0.6; }
+        
+        .container { max-width: 1000px; margin: 0 auto; padding: 60px 20px; }
+        .hero { text-align: center; margin-bottom: 60px; }
+        .hero h1 { font-size: 4.5rem; font-weight: 900; margin-bottom: 15px; background: linear-gradient(to bottom, #fff, #aaa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; line-height: 1.1; }
+        .hero p { color: var(--text-dim); font-size: 1.2rem; }
+        
+        .search-container { position: relative; margin-bottom: 80px; z-index: 10; }
+        .search-bar { background: rgba(20,20,20,0.9); border: 1px solid var(--border); border-radius: 20px; padding: 8px; display: flex; align-items: center; box-shadow: 0 20px 50px rgba(0,0,0,0.5); transition: 0.3s; }
+        .search-bar:focus-within { border-color: var(--primary); box-shadow: 0 0 30px var(--primary-glow); transform: scale(1.02); }
+        .paste-icon { width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; color: #555; cursor: pointer; font-size: 1.2rem; border-right: 1px solid var(--border); flex-shrink: 0; }
+        .paste-icon:hover { color: white; }
+        .url-inp { flex: 1; background: transparent; border: none; padding: 0 20px; font-size: 1.2rem; color: white; outline: none; height: 50px; width: 100%; min-width: 0; }
+        .go-btn { background: var(--primary); color: white; border: none; width: 60px; height: 50px; border-radius: 14px; cursor: pointer; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; transition: 0.3s; box-shadow: 0 0 15px var(--primary-glow); flex-shrink: 0; }
+        .go-btn:hover { transform: scale(1.1); border-radius: 50%; }
+        
+        /* Modals and Cards */
+        .modal-wrap { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 2000; display: none; justify-content: center; align-items: center; backdrop-filter: blur(10px); padding: 20px; }
+        .modal-box { background: #111; padding: 40px; width: 100%; max-width: 400px; border-radius: 30px; border: 1px solid #333; box-shadow: 0 0 100px rgba(255,0,0,0.2); text-align: center; position: relative; animation: popUp 0.5s ease; overflow-y: auto; max-height: 90vh; }
+        .success-icon-box { width: 80px; height: 80px; border-radius: 50%; background: var(--primary); margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 30px var(--primary-glow); animation: bounceIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .success-icon-box i { font-size: 40px; color: white; }
+        .modal-inp { width: 100%; padding: 15px; background: #000; border: 1px solid #333; color: white; margin: 10px 0; border-radius: 12px; font-size: 1rem; outline: none; }
+        .modal-inp:focus { border-color: var(--primary); }
+        
+        #planModal .modal-box { width: 100%; max-width: 900px; background: transparent; box-shadow: none; border: none; padding: 10px; }
+        .pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+        .plan-card { background: #0a0a0a; border: 1px solid #333; border-radius: 20px; padding: 30px; position: relative; display: flex; flex-direction: column; align-items: center; transition: 0.3s; }
+        .plan-card:hover { transform: translateY(-10px); border-color: var(--primary); box-shadow: 0 0 30px rgba(0,0,0,0.5); }
+        .plan-card.active-plan { border-color: var(--primary); background: rgba(214, 41, 118, 0.05); }
+        .plan-card.premium { border-color: var(--gold); }
+        .plan-card.premium:hover { box-shadow: 0 0 30px rgba(255, 215, 0, 0.2); }
+        .best-value { position: absolute; top: -12px; background: var(--gold); color: black; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 800; }
+        .plan-name { font-size: 1.5rem; font-weight: 700; margin-bottom: 10px; }
+        .price-tag { font-size: 2.5rem; font-weight: 900; margin-bottom: 20px; display: flex; align-items: flex-start; gap: 5px; }
+        .price-currency { font-size: 1rem; margin-top: 10px; color: #888; }
+        .plan-features { list-style: none; text-align: left; width: 100%; margin: 20px 0; }
+        .plan-features li { padding: 8px 0; border-bottom: 1px solid #222; color: #ccc; font-size: 0.9rem; }
+        .plan-features li i { color: var(--primary); width: 25px; }
+        .plan-features li.check-gold i { color: var(--gold); }
+        .plan-btn { width: 100%; padding: 12px; border-radius: 12px; font-weight: 700; cursor: pointer; border: 1px solid #333; background: transparent; color: white; transition: 0.2s; }
+        .plan-btn:hover { background: var(--primary); border-color: var(--primary); }
+        .plan-btn.gold-btn { background: var(--gold); color: black; border-color: var(--gold); }
+        .plan-btn.gold-btn:hover { background: white; }
+        .plan-btn.current { background: #222; cursor: default; color: #666; }
+        
+        .qr-img { width: 100%; max-width: 250px; border-radius: 15px; margin-bottom: 20px; border: 2px solid white; display:block; margin-left:auto; margin-right:auto; }
+        .upi-box { background: #222; padding: 10px 15px; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; border: 1px solid #333; flex-wrap: wrap; gap: 10px; }
+        .upi-text { font-family: monospace; font-size: 1.1rem; color: var(--gold); word-break: break-all; }
+        .copy-btn { color: #888; cursor: pointer; transition: 0.2s; }
+        .copy-btn:hover { color: white; }
+        #stepUpload { display: none; animation: slideUp 0.4s ease; }
+        #stepScan { animation: popUp 0.4s ease; }
+        
+        .dark-card { background: var(--glass); backdrop-filter: blur(15px); border: 1px solid var(--border); border-radius: 20px; padding: 30px; margin-bottom: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        #resultCard { display: none; animation: slideUp 0.6s ease-out; }
+        .res-top { display: flex; gap: 25px; margin-bottom: 25px; border-bottom: 1px solid var(--border); padding-bottom: 25px; flex-wrap: wrap; }
+        .res-img { width: 160px; height: 160px; object-fit: cover; border-radius: 12px; background: #111; flex-shrink: 0; }
+        .fmt-item { display: flex; justify-content: space-between; align-items: center; padding: 15px; margin-bottom: 10px; background: rgba(255,255,255,0.03); border-radius: 12px; transition: 0.2s; flex-wrap: wrap; gap: 10px; }
+        .fmt-item:hover { background: rgba(255,255,255,0.08); border-color: var(--primary); }
+        .dl-mini-btn { background: white; color: black; border: none; padding: 8px 20px; border-radius: 8px; font-weight: 800; cursor: pointer; transition: 0.2s; }
+        .dl-mini-btn:hover { background: var(--primary); color: white; box-shadow: 0 0 15px var(--primary); }
+        
+        .section-head { margin: 60px 0 30px; font-size: 1.5rem; letter-spacing: 2px; text-transform: uppercase; color: #555; text-align: center; }
+        
+        .step-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+        .step-card { background: var(--glass); padding: 30px; border-radius: 20px; border: 1px solid var(--border); text-align: center; transition: 0.3s; }
+        .step-card:hover { transform: translateY(-5px); border-color: var(--primary); }
+        .step-icon { width: 60px; height: 60px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 1.5rem; color: white; box-shadow: 0 0 20px var(--primary-glow); }
+        
+        .history-track { display: flex; gap: 20px; overflow-x: auto; padding-bottom: 20px; }
+        .history-track::-webkit-scrollbar { height: 4px; }
+        .history-track::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+        .hist-card { min-width: 200px; padding: 15px; cursor: pointer; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px; background: rgba(255,255,255,0.02); border-radius: 15px; transition: 0.3s; }
+        .hist-card:hover { background: rgba(255,255,255,0.05); border-color: var(--primary); }
+        .hist-img { width: 100%; height: 110px; object-fit: cover; border-radius: 10px; opacity: 0.7; transition: 0.3s; background: #111; }
+        .hist-card:hover .hist-img { opacity: 1; }
+        
+        .grid-box { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 20px; }
+        .quick-card { padding: 25px; display: flex; flex-direction: column; align-items: center; gap: 15px; text-decoration: none; color: white; border: 1px solid var(--border); background: rgba(255,255,255,0.02); border-radius: 20px; transition: 0.3s; }
+        .quick-icon { width: 60px; height: 60px; background: rgba(255,255,255,0.05); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: var(--primary); transition: 0.4s; }
+        .quick-card:hover { transform: translateY(-5px); border-color: var(--primary); }
+        .quick-card:hover .quick-icon { transform: rotate(360deg); background: var(--primary); color: white; box-shadow: 0 0 30px var(--primary); }
+        
+        .faq-item { background: rgba(255,255,255,0.02); border-bottom: 1px solid var(--border); margin-bottom: 10px; border-radius: 10px; overflow: hidden; transition: 0.3s; }
+        .faq-question { padding: 20px; font-weight: 600; cursor: pointer; display: flex; justify-content: space-between; }
+        .faq-answer { max-height: 0; overflow: hidden; padding: 0 20px; color: var(--text-dim); transition: 0.4s ease; }
+        .faq-item.active .faq-answer { max-height: 200px; padding-bottom: 20px; }
+        
+        footer { background: #050505; border-top: 1px solid var(--border); padding: 60px 0 30px; margin-top: 80px; }
+        .footer-grid { max-width: 1200px; margin: 0 auto; padding: 0 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 40px; }
+        .footer-link { display: block; color: #666; text-decoration: none; margin-bottom: 10px; transition: 0.3s; }
+        .footer-link:hover { color: var(--primary); }
+        
+        @keyframes popUp { from { opacity:0; transform:scale(0.8); } to { opacity:1; transform:scale(1); } }
+        @keyframes bounceIn { 0%{transform:scale(0);} 60%{transform:scale(1.2);} 100%{transform:scale(1);} }
+        @keyframes slideUp { from { opacity:0; transform:translateY(50px); } to { opacity:1; transform:translateY(0); } }
+        
+        @media (max-width: 768px) {
+            .nav-container { flex-direction: column; gap: 15px; padding: 0 15px; }
+            .user-nav { width: 100%; justify-content: center; flex-wrap: wrap; }
+            .hero h1 { font-size: 3rem; }
+            .hero p { font-size: 1rem; }
+            .container { padding: 40px 15px; }
+            .search-bar { flex-direction: row; }
+            .url-inp { font-size: 1rem; }
+            .paste-icon, .go-btn { width: 45px; height: 45px; }
+            .res-top { flex-direction: column; align-items: center; text-align: center; }
+            .res-img { width: 100%; height: auto; max-width: 300px; margin-bottom:15px; }
+            .fmt-item { flex-direction: column; text-align: center; gap: 15px; }
+            .dl-mini-btn { width: 100%; }
+            .footer-grid { grid-template-columns: 1fr; text-align: center; gap: 30px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="void-stream" id="voidStream"></div>
+
+    <div id="announcementBar"></div>
+
+    <div id="maintOverlay">
+        <i class="fas fa-tools" style="font-size: 4rem; color: var(--primary); margin-bottom: 20px;"></i>
+        <h1 style="font-size: 2.5rem; margin-bottom: 10px;">Under Maintenance</h1>
+        <p style="color: #888;">We are upgrading the servers. Please check back in 15 minutes.</p>
+        <button onclick="location.reload()" class="liquid-btn" style="margin-top:20px; width: auto;">Refresh</button>
+    </div>
+
+    <div class="modal-wrap" id="authModal">
+        <div class="modal-box">
+            <i class="fas fa-times" onclick="closeModal('authModal')" style="position:absolute; top:20px; right:20px; cursor:pointer; font-size:1.5rem; color:#555"></i>
+            <h2 id="authTitle" style="margin-bottom:10px; font-size:2rem">Login</h2>
+            <p id="authSub" style="color:#666; margin-bottom:30px">Login to remove the 5-download limit.</p>
+            <form id="authForm">
+                <input type="text" id="userInput" class="modal-inp" placeholder="Username" required>
+                <input type="email" id="emailInput" class="modal-inp" placeholder="Email Address" style="display:none;">
+                <input type="password" id="passInput" class="modal-inp" placeholder="Password" required>
+                <button type="submit" id="authSubmitBtn" class="liquid-btn" style="width:100%; margin-top:15px; justify-content:center">LOGIN</button>
+            </form>
+            <p onclick="toggleAuthMode()" style="margin-top:20px; color:#888; cursor:pointer; font-size:0.9rem"><span id="authSwitchText">New User? <span style="color:var(--primary)">Register Here</span></span></p>
+            <p id="authMsg" style="color:red; margin-top:10px; font-size:0.8rem"></p>
+        </div>
+    </div>
+
+    <div class="modal-wrap" id="paymentModal">
+        <div class="modal-box">
+            <i class="fas fa-times" onclick="closeModal('paymentModal')" style="position:absolute; top:20px; right:20px; cursor:pointer; font-size:1.5rem; color:#555"></i>
+            <div id="stepScan">
+                <h3 style="margin-bottom:15px; color:white">Scan to Pay</h3>
+                <img src="qr.jpeg" class="qr-img" alt="Scan QR">
+                <div class="upi-box"><span class="upi-text" id="upiId">9369228920@fam</span><i class="fas fa-copy copy-btn" onclick="copyUPI()"></i></div>
+                <button class="liquid-btn" style="width:100%; justify-content:center; background:#222; border:1px solid #333" onclick="showUploadStep()"><i class="fas fa-check-circle" style="margin-right:10px; color:var(--success)"></i> I have made the payment</button>
+            </div>
+            <div id="stepUpload">
+                <h3 style="margin-bottom:15px; color:white">Verify Payment</h3>
+                <p style="color:#888; margin-bottom:20px; font-size:0.9rem">Please upload the payment screenshot to verify.</p>
+                <form onsubmit="submitPayment(event)">
+                    <input type="hidden" id="selectedPlanName">
+                    <input type="file" id="proofFile" class="modal-inp" accept="image/*" required>
+                    <button type="submit" class="liquid-btn" style="width:100%; justify-content:center">SUBMIT PROOF</button>
+                </form>
+                <p style="margin-top:15px; color:#555; cursor:pointer; font-size:0.8rem" onclick="showScanStep()">Go back to QR</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-wrap" id="planModal">
+        <div class="modal-box">
+            <i class="fas fa-times" onclick="closeModal('planModal')" style="position:absolute; top:20px; right:20px; cursor:pointer; font-size:1.5rem; color:white; z-index:100"></i>
+            <h2 style="margin-bottom:40px; font-size:2.5rem; color:white">Choose Your Power</h2>
+            <div class="pricing-grid">
+                <div class="plan-card active-plan">
+                    <div class="plan-name">Starter</div>
+                    <div class="price-tag">Free <span class="price-currency">/forever</span></div>
+                    <ul class="plan-features">
+                        <li><i class="fas fa-check"></i> 15-25 Credits Daily</li>
+                        <li><i class="fas fa-check"></i> Standard Speed</li>
+                        <li><i class="fas fa-times" style="color:#444"></i> No Priority Support</li>
+                    </ul>
+                    <button class="plan-btn current">Current Plan</button>
+                </div>
+                <div class="plan-card">
+                    <div class="plan-name">Booster</div>
+                    <div class="price-tag">25 <span class="price-currency">rs</span></div>
+                    <ul class="plan-features">
+                        <li><i class="fas fa-check"></i> 50 Credits Instant</li>
+                        <li><i class="fas fa-check"></i> High Speed</li>
+                        <li><i class="fas fa-check"></i> Ad-free Experience</li>
+                    </ul>
+                    <button class="plan-btn" onclick="openPaymentModal('Booster')">Get Credits</button>
+                </div>
+                <div class="plan-card premium">
+                    <div class="best-value">BEST VALUE</div>
+                    <div class="plan-name" style="color:var(--gold)">God Mode</div>
+                    <div class="price-tag" style="color:var(--gold)">70 <span class="price-currency">rs</span></div>
+                    <ul class="plan-features">
+                        <li class="check-gold"><i class="fas fa-bolt"></i> Unlimited Credits</li>
+                        <li class="check-gold"><i class="fas fa-bolt"></i> Max Quality</li>
+                        <li class="check-gold"><i class="fas fa-bolt"></i> Priority Processing</li>
+                        <li class="check-gold"><i class="fas fa-bolt"></i> 24/7 Support</li>
+                    </ul>
+                    <button class="plan-btn gold-btn" onclick="openPaymentModal('God Mode')">Go Unlimited</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-wrap" id="successModal">
+        <div class="modal-box">
+            <i class="fas fa-times" onclick="closeModal('successModal')" style="position:absolute; top:20px; right:20px; cursor:pointer; font-size:1.5rem; color:#555"></i>
+            <div class="success-icon-box"><i class="fas fa-check"></i></div>
+            <h2 style="margin-bottom:10px; font-size:1.8rem">Download Complete</h2>
+            <p style="color:#666; margin-bottom:30px">Your file has been saved successfully.</p>
+            <button class="liquid-btn" onclick="closeModal('successModal')" style="width:100%; justify-content:center">OK, GREAT</button>
+        </div>
+    </div>
+
+    <header>
+        <div class="nav-container">
+            <div class="logo"><i class="fab fa-instagram"></i> In.dl</div>
+            <div class="user-nav">
+                <div class="token-pill" onclick="checkLoginAndOpenPlan()" title="Click to Top-up"><i class="fas fa-coins"></i> <span id="tokenCount">...</span></div>
+                <div id="userArea"></div> 
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        
+        <div class="hero">
+            <h1 id="heroTitle">IG Media Saver</h1>
+            <p id="heroSub">Download Reels, Stories, and Posts instantly.</p>
+        </div>
+
+        <div class="search-container">
+            <div class="search-bar">
+                <div class="paste-icon" onclick="pasteFromClipboard()"><i class="fas fa-paste"></i></div>
+                <input type="text" class="url-inp" id="urlInput" placeholder="Paste Instagram link here...">
+                <button class="go-btn" id="searchBtn" onclick="fetchInfo()"><i class="fas fa-arrow-right"></i></button>
+            </div>
+        </div>
+
+        <div class="dark-card" id="resultCard">
+            <div class="res-top">
+                <img src="" class="res-img" id="resThumb" referrerpolicy="no-referrer" onerror="this.style.display='none';">
+                <div style="flex:1">
+                    <h3 id="resTitle" style="font-size:1.4rem; margin-bottom:10px;">Loading...</h3>
+                    <div id="resMeta" style="color:#666;"><i class="fas fa-clock"></i> 00:00</div>
+                </div>
+            </div>
+            <div id="formatList"></div>
+        </div>
+
+        <div id="historySection" style="display:none">
+            <div class="section-head">Recent Activity</div>
+            <div class="history-track" id="historyList"></div>
+        </div>
+
+        <div class="section-head">Ecosystem</div>
+        <div class="grid-box" id="relateGrid">
+            <a href="#" class="quick-card"><div class="quick-icon"><i class="fas fa-video"></i></div><span style="font-weight:700">Reels</span></a>
+            <a href="#" class="quick-card"><div class="quick-icon"><i class="fas fa-clock"></i></div><span style="font-weight:700">Stories</span></a>
+            <a href="#" class="quick-card"><div class="quick-icon"><i class="fas fa-image"></i></div><span style="font-weight:700">Posts</span></a>
+            <a href="#" class="quick-card"><div class="quick-icon"><i class="fas fa-tv"></i></div><span style="font-weight:700">IGTV</span></a>
+        </div>
+
+        <div class="section-head">How It Works</div>
+        <div class="step-grid">
+            <div class="step-card">
+                <div class="step-icon"><i class="fas fa-copy"></i></div>
+                <h4>1. Copy Link</h4>
+                <p style="color:#666; margin-top:10px; font-size:0.9rem">Copy the URL of the Instagram Reel or Post.</p>
+            </div>
+            <div class="step-card">
+                <div class="step-icon"><i class="fas fa-paste"></i></div>
+                <h4>2. Paste & Go</h4>
+                <p style="color:#666; margin-top:10px; font-size:0.9rem">Paste the link above and hit the go button.</p>
+            </div>
+            <div class="step-card">
+                <div class="step-icon"><i class="fas fa-download"></i></div>
+                <h4>3. Download</h4>
+                <p style="color:#666; margin-top:10px; font-size:0.9rem">Save the file instantly to your device.</p>
+            </div>
+        </div>
+
+        <div class="section-head">Questions</div>
+        <div id="faqSection" style="max-width:800px; margin:0 auto">
+            <div class="faq-item" onclick="toggleFaq(this)">
+                <div class="faq-question">Is it free? <i class="fas fa-chevron-down"></i></div>
+                <div class="faq-answer"><p>Yes, for limited use. Login for more.</p></div>
+            </div>
+            <div class="faq-item" onclick="toggleFaq(this)">
+                <div class="faq-question">Where are files saved? <i class="fas fa-chevron-down"></i></div>
+                <div class="faq-answer"><p>They are saved to your device's default 'Downloads' folder.</p></div>
+            </div>
+            <div class="faq-item" onclick="toggleFaq(this)">
+                <div class="faq-question">Is it secure? <i class="fas fa-chevron-down"></i></div>
+                <div class="faq-answer"><p>Yes, we do not store any personal data or files.</p></div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="footer-grid">
+            <div class="footer-col"><h4 style="color:white; margin-bottom:20px">In.dl</h4><p style="color:#666">The best Instagram Downloader.</p></div>
+            <div class="footer-col"><h4 style="color:white; margin-bottom:20px">Support</h4><a href="about.html" class="footer-link">About</a><a href="contact.html" class="footer-link">Contact</a></div>
+            <div class="footer-col"><h4 style="color:white; margin-bottom:20px">Legal</h4><a href="privacy.html" class="footer-link">Privacy</a><a href="terms.html" class="footer-link">Terms</a></div>
+        </div>
+        <div style="text-align:center; color:#444; margin-top:50px; border-top:1px solid #111; padding-top:20px">&copy; 2026 In.dl Downloader By Ashish.</div>
+    </footer>
+
+    <script>
+        const API_URL = "/api"; 
+        let authToken = localStorage.getItem('token');
+        let isLoginMode = true;
+
+        window.onload = () => { 
+            spawnParticles(); 
+            checkStatus(); 
+            loadHistory(); 
+            
+            document.getElementById('urlInput').addEventListener('keypress', function (e) { 
+                if (e.key === 'Enter') fetchInfo(); 
+            }); 
+            
+            window.onclick = function(e) { 
+                if (!e.target.closest('.profile-wrap')) { 
+                    const menu = document.querySelector('.dropdown-menu'); 
+                    const btn = document.querySelector('.profile-btn'); 
+                    if (menu && menu.classList.contains('show')) { 
+                        menu.classList.remove('show'); 
+                        if(btn) btn.classList.remove('active'); 
+                    } 
+                } 
+            } 
+        };
+        
+        function checkLoginAndOpenPlan() {
+            if(!authToken) { 
+                alert("Please Login First!");
+                openModal('authModal'); 
+                return; 
+            }
+            openModal('planModal');
+        }
+
+        function toggleProfile(e) { 
+            e.stopPropagation(); 
+            const menu = document.querySelector('.dropdown-menu'); 
+            const btn = document.querySelector('.profile-btn'); 
+            if(menu) { 
+                menu.classList.toggle('show'); 
+                if(btn) btn.classList.toggle('active'); 
+            } 
+        }
+
+        function spawnParticles() { 
+            const container = document.getElementById('voidStream'); 
+            const icons = ['fa-camera', 'fa-image', 'fa-video', 'fa-heart', 'fa-comment']; 
+            for(let i=0; i<20; i++) { 
+                let el = document.createElement('i'); 
+                el.className = `fas ${icons[Math.floor(Math.random()*icons.length)]} stream-icon`; 
+                el.style.left = Math.random() * 100 + '%'; 
+                el.style.animationDuration = (Math.random() * 5 + 10) + 's'; 
+                el.style.animationDelay = Math.random() * 5 + 's'; 
+                container.appendChild(el); 
+            } 
+        }
+
+        function toggleFaq(el) { el.classList.toggle('active'); }
+        function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+        
+        function openPaymentModal(planName) { 
+            if(!authToken) { alert("Please Login First"); openModal('authModal'); return; } 
+            closeModal('planModal'); 
+            document.getElementById('selectedPlanName').value = planName; 
+            showScanStep(); 
+            openModal('paymentModal'); 
+        }
+
+        function showUploadStep() { document.getElementById('stepScan').style.display = 'none'; document.getElementById('stepUpload').style.display = 'block'; }
+        function showScanStep() { document.getElementById('stepScan').style.display = 'block'; document.getElementById('stepUpload').style.display = 'none'; }
+        function copyUPI() { const txt = document.getElementById('upiId').innerText; navigator.clipboard.writeText(txt); alert("UPI ID Copied: " + txt); }
+
+        async function submitPayment(e) { 
+            e.preventDefault(); 
+            const plan = document.getElementById('selectedPlanName').value; 
+            const file = document.getElementById('proofFile').files[0]; 
+            const formData = new FormData(); 
+            formData.append('plan_name', plan); 
+            formData.append('screenshot', file); 
+            try { 
+                const res = await fetch(`${API_URL}/payment/request`, { method: 'POST', headers: { 'Authorization': `Bearer ${authToken}` }, body: formData }); 
+                if(res.ok) { closeModal('paymentModal'); showScanStep(); alert("Submitted! Please wait for admin approval."); } 
+                else alert("Upload Failed"); 
+            } catch(e) { alert("Error connecting to server"); } 
+        }
+
+        async function checkStatus() { 
+            try { 
+                const res = await fetch(`${API_URL}/status`, { headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {} }); 
+                const d = await res.json(); 
+
+                // NEW FEATURE: MAINTENANCE CHECK (COMMENTED OUT TO PREVENT LOCKOUT)
+                /*
+                if(d.maintenance && !d.is_admin) {
+                    document.getElementById('maintOverlay').style.display = 'flex';
+                    return; // Stop execution to block access
+                }
+                */
+
+                // NEW FEATURE: ANNOUNCEMENT BAR
+                if(d.announcement) {
+                    const bar = document.getElementById('announcementBar');
+                    bar.innerText = d.announcement;
+                    bar.style.display = 'block';
+                } else {
+                    document.getElementById('announcementBar').style.display = 'none';
+                }
+
+                document.getElementById('tokenCount').innerText = `${d.tokens} / ${d.is_logged_in ? '∞' : 5}`; 
+                const userHtml = `<div class="profile-wrap"><div class="profile-btn" onclick="toggleProfile(event)"><i class="fas fa-user${d.is_logged_in ? '-astronaut' : ''}"></i></div><div class="dropdown-menu"><div class="dd-user">${d.is_logged_in ? d.username : 'Guest User'}</div><div class="dd-role">${d.plan}</div>${d.is_admin ? '<a href="admin.html" class="dd-link"><i class="fas fa-shield-alt"></i> Admin Panel</a>' : ''}<button class="liquid-btn" style="width:100%; font-size:0.9rem; padding:8px; margin-top:5px" onclick="${d.is_logged_in ? 'doLogout()' : "openModal('authModal')" }">${d.is_logged_in ? 'LOGOUT' : 'LOGIN'}</button></div></div>`; 
+                document.getElementById('userArea').innerHTML = userHtml; 
+            } catch(e){} 
+        }
+
+        async function fetchInfo() { 
+            const url = document.getElementById('urlInput').value; 
+            const btn = document.getElementById('searchBtn'); 
+            if(!url) return; 
+            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i>'; 
+            try { 
+                const res = await fetch(`${API_URL}/info`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ url }) }); 
+                const data = await res.json(); 
+                if(data.error) throw new Error("Not Found"); 
+                
+                addToHistory(data, url); 
+                
+                const thumb = document.getElementById('resThumb');
+                thumb.src = data.thumbnail; 
+                thumb.style.display = 'block'; 
+                
+                document.getElementById('resTitle').innerText = data.title; 
+                document.getElementById('resMeta').innerHTML = `<i class="fas fa-clock"></i> ${data.duration}`; 
+                document.getElementById('formatList').innerHTML = data.formats.map(fmt => `<div class="fmt-item"><div><div style="font-weight:bold; font-size:1.1rem">${fmt.quality}</div><div style="font-size:0.8rem; color:#666">${fmt.ext.toUpperCase()} • ${fmt.size}</div></div><button class="dl-mini-btn" onclick="startDownload('${url}', '${fmt.id}', this)">GET</button></div>`).join(''); 
+                document.getElementById('resultCard').style.display = 'block'; 
+            } catch(e) { alert("Error: " + e.message); } 
+            finally { btn.innerHTML = '<i class="fas fa-arrow-right"></i>'; } 
+        }
+
+        async function startDownload(url, fmtId, btn) { 
+            const orgHtml = btn.innerHTML; 
+            btn.disabled = true; 
+            btn.innerHTML = '...'; 
+            const headers = { 'Content-Type': 'application/json' }; 
+            if(authToken) headers['Authorization'] = `Bearer ${authToken}`; 
+            try { 
+                const res = await fetch(`${API_URL}/download`, { method: 'POST', headers, body: JSON.stringify({ url, format_id: fmtId }) }); 
+                const data = await res.json(); 
+                
+                // NEW FEATURE: Handle Banned/Maintenance Errors
+                if(res.status === 403 && data.error === "BANNED") {
+                    alert(data.message);
+                    btn.innerHTML = orgHtml; btn.disabled = false;
+                    return;
+                }
+                if(res.status === 503) {
+                    alert(data.message);
+                    btn.innerHTML = orgHtml; btn.disabled = false;
+                    return;
+                }
+
+                if(res.status === 403) { 
+                    if(authToken) { alert("Daily Limit Reached! Buy more credits."); openModal('planModal'); } 
+                    else { alert("Guest Limit Reached! Login for more."); openModal('authModal'); } 
+                    btn.innerHTML = orgHtml; btn.disabled = false; return; 
+                } 
+                
+                checkStatus(); 
+                const timer = setInterval(async () => { 
+                    const s = await fetch(`${API_URL}/progress/${data.job_id}`).then(r => r.json()); 
+                    if(s.status === 'downloading') btn.innerText = s.percent + "%"; 
+                    else if(s.status === 'completed') { 
+                        clearInterval(timer); 
+                        btn.innerHTML = "DONE"; 
+                        openModal('successModal'); 
+                        window.location.href = `${API_URL}/file/${data.job_id}`; 
+                        setTimeout(() => { btn.innerHTML = orgHtml; btn.disabled = false; }, 3000); 
+                    } 
+                }, 250); 
+            } catch(e) { btn.innerHTML = "ERR"; btn.disabled = false; } 
+        }
+
+        function addToHistory(d, u) { 
+            let h = JSON.parse(localStorage.getItem('h')||'[]'); 
+            h = h.filter(x => x.u !== u); 
+            h.unshift({ t: d.title, i: d.thumbnail, u: u }); 
+            if(h.length > 5) h.pop(); 
+            localStorage.setItem('h', JSON.stringify(h)); 
+            loadHistory(); 
+        }
+
+        function loadHistory() { 
+            const h = JSON.parse(localStorage.getItem('h')||'[]'); 
+            const el = document.getElementById('historyList'); 
+            document.getElementById('historySection').style.display = h.length ? 'block' : 'none'; 
+            el.innerHTML = h.map(x => `<div class="hist-card" onclick="document.getElementById('urlInput').value='${x.u}'; fetchInfo()"><img src="${x.i}" class="hist-img" referrerpolicy="no-referrer"><div style="font-size:0.8rem; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">${x.t}</div></div>`).join(''); 
+        }
+
+        async function pasteFromClipboard() { try { document.getElementById('urlInput').value = await navigator.clipboard.readText(); } catch(e){} }
+        
+        function toggleAuthMode() { 
+            isLoginMode = !isLoginMode; 
+            const title = document.getElementById('authTitle'); 
+            const sub = document.getElementById('authSub'); 
+            const btn = document.getElementById('authSubmitBtn'); 
+            const link = document.getElementById('authSwitchText'); 
+            const emailInp = document.getElementById('emailInput'); 
+            if(isLoginMode) { 
+                title.innerText = "Login"; sub.innerText = "Login to remove the 5-download limit."; btn.innerText = "LOGIN"; 
+                link.innerHTML = 'New User? <span style="color:var(--primary)">Register Here</span>'; emailInp.style.display = 'none'; 
+            } else { 
+                title.innerText = "Create Account"; sub.innerText = "Sign up to unlock more features."; btn.innerText = "SIGN UP"; 
+                link.innerHTML = 'Already have an account? <span style="color:var(--primary)">Login Here</span>'; emailInp.style.display = 'block'; 
+            } 
+        }
+
+        function doLogout() { localStorage.removeItem('token'); authToken=null; location.reload(); }
+        
+        document.getElementById('authForm').onsubmit = async (e) => { 
+            e.preventDefault(); 
+            const u = document.getElementById('userInput').value; 
+            const p = document.getElementById('passInput').value; 
+            const email = document.getElementById('emailInput').value; 
+            const ep = isLoginMode ? 'login' : 'register'; 
+            const body = { username: u, password: p }; 
+            if(!isLoginMode) body.email = email; 
+            const res = await fetch(`${API_URL}/${ep}`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) }); 
+            const d = await res.json(); 
+            if(res.ok && isLoginMode) { localStorage.setItem('token', d.token); authToken=d.token; closeModal('authModal'); checkStatus(); } 
+            else if(res.ok) { alert("Done! Login now."); toggleAuthMode(); } 
+            else document.getElementById('authMsg').innerText = d.message; 
+        };
+    </script>
+</body>
+
+</html>
