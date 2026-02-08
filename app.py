@@ -434,7 +434,7 @@ def admin_reset_pass():
     return jsonify({"message": "Reset"})
 
 # -------------------------
-# DOWNLOADER LOGIC (UPDATED & FIXED)
+# DOWNLOADER LOGIC (FIXED)
 # -------------------------
 def format_bytes(size):
     if not size: return "N/A"
@@ -452,7 +452,7 @@ def get_video_formats(url):
     ydl_opts = { 
         "quiet": True, 
         "no_warnings": True,
-        # Removed "extract_flat" so it actually fetches formats
+        # IMPORTANT: 'extract_flat' is NOT set to True, so yt-dlp actually checks the media
         "http_headers": { 
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" 
         },
@@ -462,12 +462,11 @@ def get_video_formats(url):
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # First, try to get info
+            # extract_info with download=False fetches metadata
             info = ydl.extract_info(url, download=False)
             formats_list = []
             
-            # Check if it is a Carousel (Playlist)
-            # Some entries might be None or missing, so filter them
+            # Check for playlist/carousel entries
             if 'entries' in info:
                 media_items = [i for i in list(info['entries']) if i]
             else:
@@ -475,16 +474,19 @@ def get_video_formats(url):
 
             count = 1
             for item in media_items:
-                # Basic check for video/image
-                is_video = False
-                if item.get('vcodec') != 'none' and item.get('acodec') != 'none':
-                    is_video = True
+                # Instagram sometimes returns 'none' for codec even if it is a video, 
+                # so we check 'ext' as well.
+                ext = item.get('ext', 'jpg')
                 
-                # Some extractors explicitly state 'image'
-                if item.get('ext') in ['jpg', 'jpeg', 'png', 'webp']:
+                # Assume it's a video if extension is mp4/mov OR explicit video codecs exist
+                is_video = (ext in ['mp4', 'mov']) or (item.get('vcodec') != 'none' and item.get('acodec') != 'none')
+                
+                # Explicit check for image extensions
+                if ext in ['jpg', 'jpeg', 'png', 'webp']:
                     is_video = False
 
                 direct_url = item.get('url')
+                thumb = item.get('thumbnail') or item.get('url')
                 
                 if is_video:
                     f_size = safe_float(item.get('filesize') or item.get('filesize_approx'))
@@ -495,7 +497,7 @@ def get_video_formats(url):
                         "ext": "mp4", 
                         "size": format_bytes(f_size),
                         "download_url": direct_url, 
-                        "thumb": item.get('thumbnail')
+                        "thumb": thumb
                     })
                 else:
                     formats_list.append({
@@ -505,7 +507,7 @@ def get_video_formats(url):
                         "ext": "jpg", 
                         "size": "N/A",
                         "download_url": direct_url,
-                        "thumb": item.get('thumbnail') or item.get('url')
+                        "thumb": thumb
                     })
                 count += 1
 
