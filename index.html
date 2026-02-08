@@ -483,42 +483,23 @@
                 
                 document.getElementById('resTitle').innerText = data.title; 
                 document.getElementById('resMeta').innerHTML = `<i class="fas fa-clock"></i> ${data.duration}`; 
-                
-                // UPDATED RENDERING FOR IMAGES/CAROUSELS
-                document.getElementById('formatList').innerHTML = data.formats.map(fmt => `
-                    <div class="fmt-item">
-                        <div style="display:flex; align-items:center; gap:15px; width:100%;">
-                            ${fmt.thumb ? `<img src="${fmt.thumb}" style="width:50px; height:50px; object-fit:cover; border-radius:5px;">` : ''}
-                            <div style="flex:1;">
-                                <div style="font-weight:bold; font-size:1.1rem">
-                                    <i class="fas fa-${fmt.type === 'video' ? 'video' : 'image'}"></i> ${fmt.quality}
-                                </div>
-                                <div style="font-size:0.8rem; color:#666">${fmt.ext.toUpperCase()} ${fmt.size !== 'N/A' ? '• '+fmt.size : ''}</div>
-                            </div>
-                            <button class="dl-mini-btn" onclick="startDownload('${url}', '${fmt.id}', '${fmt.download_url}', this)">DOWNLOAD</button>
-                        </div>
-                    </div>
-                `).join(''); 
+                document.getElementById('formatList').innerHTML = data.formats.map(fmt => `<div class="fmt-item"><div><div style="font-weight:bold; font-size:1.1rem">${fmt.quality}</div><div style="font-size:0.8rem; color:#666">${fmt.ext.toUpperCase()} • ${fmt.size}</div></div><button class="dl-mini-btn" onclick="startDownload('${url}', '${fmt.id}', this)">GET</button></div>`).join(''); 
                 document.getElementById('resultCard').style.display = 'block'; 
             } catch(e) { alert("Error: " + e.message); } 
             finally { btn.innerHTML = '<i class="fas fa-arrow-right"></i>'; } 
         }
 
-        async function startDownload(url, fmtId, downloadUrl, btn) { 
+        async function startDownload(url, fmtId, btn) { 
             const orgHtml = btn.innerHTML; 
             btn.disabled = true; 
             btn.innerHTML = '...'; 
             const headers = { 'Content-Type': 'application/json' }; 
             if(authToken) headers['Authorization'] = `Bearer ${authToken}`; 
             try { 
-                // Pass download_url to backend
-                const res = await fetch(`${API_URL}/download`, { 
-                    method: 'POST', 
-                    headers, 
-                    body: JSON.stringify({ url, format_id: fmtId, download_url: downloadUrl }) 
-                }); 
+                const res = await fetch(`${API_URL}/download`, { method: 'POST', headers, body: JSON.stringify({ url, format_id: fmtId }) }); 
                 const data = await res.json(); 
                 
+                // NEW FEATURE: Handle Banned/Maintenance Errors
                 if(res.status === 403 && data.error === "BANNED") {
                     alert(data.message);
                     btn.innerHTML = orgHtml; btn.disabled = false;
@@ -546,11 +527,7 @@
                         openModal('successModal'); 
                         window.location.href = `${API_URL}/file/${data.job_id}`; 
                         setTimeout(() => { btn.innerHTML = orgHtml; btn.disabled = false; }, 3000); 
-                    } else if(s.status === 'error') {
-                         clearInterval(timer);
-                         alert("Download Error: " + s.error);
-                         btn.innerHTML = "ERR";
-                    }
+                    } 
                 }, 250); 
             } catch(e) { btn.innerHTML = "ERR"; btn.disabled = false; } 
         }
@@ -607,4 +584,5 @@
         };
     </script>
 </body>
+
 </html>

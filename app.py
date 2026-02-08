@@ -11,7 +11,6 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import jwt 
 import secrets
-import requests
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
@@ -104,13 +103,15 @@ def init_db():
         c.execute("CREATE TABLE IF NOT EXISTS banned_ips (ip TEXT PRIMARY KEY, reason TEXT, timestamp DATETIME)")
         conn.commit()
 
-    # 2. AUTO-FIX MISSING COLUMNS
+    # 2. AUTO-FIX MISSING COLUMNS (DATABASE MIGRATION)
+    # This prevents the "Username Taken" error if your DB is old
     try:
         if db_type == "postgres":
             c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code TEXT UNIQUE")
             c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by TEXT")
             c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT")
         else:
+            # SQLite check columns first
             c.execute("PRAGMA table_info(users)")
             cols = [info[1] for info in c.fetchall()]
             if "referral_code" not in cols: c.execute("ALTER TABLE users ADD COLUMN referral_code TEXT UNIQUE")
@@ -224,6 +225,7 @@ def register():
     bonus = 0
     
     try:
+        # Check Referral
         if used_ref:
             q = "SELECT id FROM users WHERE referral_code=%s" if t == "postgres" else "SELECT id FROM users WHERE referral_code=?"
             c.execute(q, (used_ref,))
@@ -233,6 +235,7 @@ def register():
                 c.execute(u_q, (referrer['id'] if isinstance(referrer, dict) else referrer[0],))
                 bonus = 10 
 
+        # Insert User
         q = "INSERT INTO users(username, email, password, tokens, last_reset, is_admin, plan, referral_code, referred_by) VALUES (%s, %s, %s, %s, %s, 0, 'Free', %s, %s)" if t == "postgres" else "INSERT INTO users(username, email, password, tokens, last_reset, is_admin, plan, referral_code, referred_by) VALUES (?, ?, ?, ?, ?, 0, 'Free', ?, ?)"
         c.execute(q, (
             data["username"].lower(), 
@@ -246,7 +249,9 @@ def register():
         conn.commit()
         return jsonify({"message": f"Registered! {'You got +10 credits!' if bonus else ''}"}), 201
     except Exception as e:
+        # DEBUG LOGGING FOR ERRORS
         print(f"❌ REGISTRATION ERROR: {e}") 
+        # Return generic error to user but we see logs
         if "UNIQUE constraint" in str(e) or "duplicate key" in str(e):
             return jsonify({"message": "Username taken"}), 409
         return jsonify({"message": "Server Error during registration"}), 500
@@ -434,7 +439,7 @@ def admin_reset_pass():
     return jsonify({"message": "Reset"})
 
 # -------------------------
-# DOWNLOADER LOGIC (FIXED)
+# DOWNLOADER LOGIC (DESKTOP MODE + COOKIES)
 # -------------------------
 def format_bytes(size):
     if not size: return "N/A"
@@ -449,10 +454,12 @@ def safe_float(val):
     except: return 0.0
 
 def get_video_formats(url):
+    # USE COOKIES + DESKTOP USER AGENT
     ydl_opts = { 
         "quiet": True, 
-        "no_warnings": True,
-        # IMPORTANT: 'extract_flat' is NOT set to True, so yt-dlp actually checks the media
+        "no_warnings": True, 
+        "noplaylist": True, 
+        "extract_flat": "in_playlist",
         "http_headers": { 
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" 
         },
@@ -462,127 +469,76 @@ def get_video_formats(url):
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # extract_info with download=False fetches metadata
             info = ydl.extract_info(url, download=False)
             formats_list = []
-            
-            # Check for playlist/carousel entries
-            if 'entries' in info:
-                media_items = [i for i in list(info['entries']) if i]
+            is_insta = 'instagram' in info.get('webpage_url_domain', 'youtube')
+            duration = safe_float(info.get('duration'))
+            mp3_size = (128 * 1000 * duration) / 8 if duration > 0 else 0
+            formats_list.append({"id": "mp3-128", "type": "audio", "quality": "128kbps", "ext": "mp3", "size": format_bytes(mp3_size)})
+
+            if is_insta:
+                f_size = safe_float(info.get('filesize') or info.get('filesize_approx'))
+                formats_list.append({"id": "best", "type": "video", "quality": "HD (Best)", "ext": "mp4", "size": format_bytes(f_size)})
             else:
-                media_items = [info]
+                seen_res = set()
+                for f in info.get('formats', []):
+                    h = f.get('height')
+                    if not h or h in seen_res or h < 144: continue
+                    seen_res.add(h)
+                    if not FFMPEG_PATH and f.get('acodec') == 'none': continue 
+                    f_size = safe_float(f.get('filesize') or f.get('filesize_approx'))
+                    if f_size == 0 and duration > 0:
+                        tbr = safe_float(f.get('tbr'))
+                        if tbr > 0: f_size = (tbr * 1000 * duration) / 8
+                    formats_list.append({"id": f"video-{h}", "type": "video", "quality": f"{h}p", "ext": "mp4", "size": format_bytes(f_size), "height": h})
+                formats_list.sort(key=lambda x: x.get('height', 0), reverse=True)
 
-            count = 1
-            for item in media_items:
-                # Instagram sometimes returns 'none' for codec even if it is a video, 
-                # so we check 'ext' as well.
-                ext = item.get('ext', 'jpg')
-                
-                # Assume it's a video if extension is mp4/mov OR explicit video codecs exist
-                is_video = (ext in ['mp4', 'mov']) or (item.get('vcodec') != 'none' and item.get('acodec') != 'none')
-                
-                # Explicit check for image extensions
-                if ext in ['jpg', 'jpeg', 'png', 'webp']:
-                    is_video = False
-
-                direct_url = item.get('url')
-                thumb = item.get('thumbnail') or item.get('url')
-                
-                if is_video:
-                    f_size = safe_float(item.get('filesize') or item.get('filesize_approx'))
-                    formats_list.append({
-                        "id": f"video-{count}", 
-                        "type": "video", 
-                        "quality": "Video", 
-                        "ext": "mp4", 
-                        "size": format_bytes(f_size),
-                        "download_url": direct_url, 
-                        "thumb": thumb
-                    })
-                else:
-                    formats_list.append({
-                        "id": f"image-{count}", 
-                        "type": "image", 
-                        "quality": "Image", 
-                        "ext": "jpg", 
-                        "size": "N/A",
-                        "download_url": direct_url,
-                        "thumb": thumb
-                    })
-                count += 1
-
-            return { 
-                "title": info.get("title", "Instagram Post"), 
-                "thumbnail": info.get("thumbnail", ""), 
-                "duration": info.get("duration_string", "N/A"), 
-                "formats": formats_list 
-            }
+            return { "title": info.get("title", "Video"), "thumbnail": info.get("thumbnail", ""), "duration": info.get("duration_string", "N/A"), "formats": formats_list }
     except Exception as e: 
         print(f"Info Error: {e}")
         return None
 
-def process_download(job_id, original_url, fmt_id, direct_download_url=None):
+def process_download(job_id, url, fmt_id):
     with download_semaphore:
         job_status[job_id]["status"] = "downloading"
-        
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        def progress_hook(d):
+            if d["status"] == "downloading":
+                raw_percent = d.get("_percent_str", "0%")
+                clean_percent = re.sub(r'\x1b\[[0-9;]*m', '', raw_percent).strip()
+                job_status[job_id].update({"percent": clean_percent.replace("%",""), "speed": d.get("_speed_str", "N/A")})
+
+        ydl_opts = {
+            "outtmpl": os.path.join(DOWNLOAD_FOLDER, f"{job_id}_%(title)s.%(ext)s"),
+            "progress_hooks": [progress_hook],
+            "quiet": True,
+            "concurrent_fragment_downloads": 10,
+            "buffersize": 1024 * 1024,
+            "http_headers": { 
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" 
+            },
+            "cookiefile": COOKIE_FILE if os.path.exists(COOKIE_FILE) else None,
+            "ffmpeg_location": FFMPEG_PATH
         }
 
+        if "mp3" in fmt_id:
+            ydl_opts["format"] = "bestaudio/best"
+            if FFMPEG_PATH: ydl_opts["postprocessors"] = [{"key": "FFmpegExtractAudio","preferredcodec": "mp3"}]
+        elif fmt_id == "best": ydl_opts["format"] = "best"
+        elif "video" in fmt_id:
+            height = fmt_id.replace("video-", "")
+            if FFMPEG_PATH:
+                ydl_opts["format"] = f"best[height<={height}]/bestvideo[height<={height}]+bestaudio/best[height<={height}]"
+                ydl_opts["merge_output_format"] = "mp4"
+            else: ydl_opts["format"] = f"best[height<={height}]"
+
         try:
-            # OPTION 1: Direct Download (Images/Carousel Items/Single Videos with Direct URL)
-            if direct_download_url:
-                ext = "jpg" if "image" in fmt_id else "mp4"
-                filename = f"{job_id}_insta_download.{ext}"
-                filepath = os.path.join(DOWNLOAD_FOLDER, filename)
-
-                # Fake Progress for direct download
-                job_status[job_id].update({"percent": "50", "speed": "Requesting..."})
-                
-                # Use requests to download
-                with requests.get(direct_download_url, headers=headers, stream=True) as r:
-                    r.raise_for_status()
-                    with open(filepath, 'wb') as f:
-                        for chunk in r.iter_content(chunk_size=8192): 
-                            f.write(chunk)
-                
-                job_status[job_id].update({"status": "completed", "file": filepath, "filename": filename, "percent": "100"})
-                return
-
-            # OPTION 2: Fallback (Standard yt-dlp)
-            def progress_hook(d):
-                if d["status"] == "downloading":
-                    raw_percent = d.get("_percent_str", "0%")
-                    clean_percent = re.sub(r'\x1b\[[0-9;]*m', '', raw_percent).strip()
-                    job_status[job_id].update({"percent": clean_percent.replace("%",""), "speed": d.get("_speed_str", "N/A")})
-
-            ydl_opts = {
-                "outtmpl": os.path.join(DOWNLOAD_FOLDER, f"{job_id}_%(title)s.%(ext)s"),
-                "progress_hooks": [progress_hook],
-                "quiet": True,
-                "http_headers": headers,
-                "cookiefile": COOKIE_FILE if os.path.exists(COOKIE_FILE) else None,
-                "ffmpeg_location": FFMPEG_PATH
-            }
-
-            if "mp3" in fmt_id:
-                ydl_opts["format"] = "bestaudio/best"
-                if FFMPEG_PATH: ydl_opts["postprocessors"] = [{"key": "FFmpegExtractAudio","preferredcodec": "mp3"}]
-            elif fmt_id == "best": ydl_opts["format"] = "best"
-            elif "video" in fmt_id:
-                height = fmt_id.replace("video-", "")
-                if FFMPEG_PATH and height.isdigit():
-                    ydl_opts["format"] = f"best[height<={height}]/bestvideo[height<={height}]+bestaudio/best[height<={height}]"
-                    ydl_opts["merge_output_format"] = "mp4"
-                else: ydl_opts["format"] = "best"
-
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.extract_info(original_url, download=True)
+                ydl.extract_info(url, download=True)
                 for f in os.listdir(DOWNLOAD_FOLDER):
                     if f.startswith(job_id):
                         job_status[job_id].update({"status": "completed", "file": os.path.join(DOWNLOAD_FOLDER, f), "filename": f})
                         return
-                raise Exception("File missing after download")
+                raise Exception("File missing")
         except Exception as e:
             job_status[job_id].update({"status": "error", "error": str(e)})
 
@@ -614,9 +570,7 @@ def api_download():
     data = request.json
     job_id = str(uuid.uuid4())
     job_status[job_id] = {"status": "queued", "percent": "0"}
-    
-    # Pass download_url to background logic
-    executor.submit(process_download, job_id, data.get("url"), data.get("format_id"), data.get("download_url"))
+    executor.submit(process_download, job_id, data.get("url"), data.get("format_id"))
     return jsonify({"job_id": job_id})
 
 @app.route("/api/progress/<job_id>")
