@@ -5,14 +5,13 @@ import os
 import shutil
 import uuid
 import time
-import requests
 import threading
 import re
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import jwt 
 import secrets
-import requests  # Added for direct downloads
+import requests
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
@@ -435,7 +434,7 @@ def admin_reset_pass():
     return jsonify({"message": "Reset"})
 
 # -------------------------
-# DOWNLOADER LOGIC (UPDATED FOR CAROUSELS)
+# DOWNLOADER LOGIC (UPDATED & FIXED)
 # -------------------------
 def format_bytes(size):
     if not size: return "N/A"
@@ -452,8 +451,8 @@ def safe_float(val):
 def get_video_formats(url):
     ydl_opts = { 
         "quiet": True, 
-        "no_warnings": True, 
-        "extract_flat": True, # Don't download, just get metadata
+        "no_warnings": True,
+        # Removed "extract_flat" so it actually fetches formats
         "http_headers": { 
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" 
         },
@@ -463,28 +462,31 @@ def get_video_formats(url):
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            # First, try to get info
             info = ydl.extract_info(url, download=False)
             formats_list = []
             
-            # Check if it is a Carousel (Playlist) or Single Post
+            # Check if it is a Carousel (Playlist)
+            # Some entries might be None or missing, so filter them
             if 'entries' in info:
-                media_items = list(info['entries'])
+                media_items = [i for i in list(info['entries']) if i]
             else:
                 media_items = [info]
 
             count = 1
             for item in media_items:
-                # Determine if it is a video or image
-                # yt-dlp usually marks images with 'format_note': 'image' or no 'vcodec'
-                is_video = item.get('vcodec') != 'none' and item.get('acodec') != 'none'
+                # Basic check for video/image
+                is_video = False
+                if item.get('vcodec') != 'none' and item.get('acodec') != 'none':
+                    is_video = True
+                
+                # Some extractors explicitly state 'image'
                 if item.get('ext') in ['jpg', 'jpeg', 'png', 'webp']:
                     is_video = False
 
-                # Get Direct URL (Instagram usually provides a direct http link in 'url')
                 direct_url = item.get('url')
                 
                 if is_video:
-                    # It's a Video
                     f_size = safe_float(item.get('filesize') or item.get('filesize_approx'))
                     formats_list.append({
                         "id": f"video-{count}", 
@@ -492,11 +494,10 @@ def get_video_formats(url):
                         "quality": "Video", 
                         "ext": "mp4", 
                         "size": format_bytes(f_size),
-                        "download_url": direct_url, # Pass direct URL for specific downloading
+                        "download_url": direct_url, 
                         "thumb": item.get('thumbnail')
                     })
                 else:
-                    # It's an Image
                     formats_list.append({
                         "id": f"image-{count}", 
                         "type": "image", 
@@ -527,15 +528,16 @@ def process_download(job_id, original_url, fmt_id, direct_download_url=None):
         }
 
         try:
-            # OPTION 1: Direct Download (Images/Carousel Items)
+            # OPTION 1: Direct Download (Images/Carousel Items/Single Videos with Direct URL)
             if direct_download_url:
                 ext = "jpg" if "image" in fmt_id else "mp4"
                 filename = f"{job_id}_insta_download.{ext}"
                 filepath = os.path.join(DOWNLOAD_FOLDER, filename)
 
-                # Simulated Progress
-                job_status[job_id].update({"percent": "50", "speed": "Checking..."})
+                # Fake Progress for direct download
+                job_status[job_id].update({"percent": "50", "speed": "Requesting..."})
                 
+                # Use requests to download
                 with requests.get(direct_download_url, headers=headers, stream=True) as r:
                     r.raise_for_status()
                     with open(filepath, 'wb') as f:
@@ -556,8 +558,6 @@ def process_download(job_id, original_url, fmt_id, direct_download_url=None):
                 "outtmpl": os.path.join(DOWNLOAD_FOLDER, f"{job_id}_%(title)s.%(ext)s"),
                 "progress_hooks": [progress_hook],
                 "quiet": True,
-                "concurrent_fragment_downloads": 10,
-                "buffersize": 1024 * 1024,
                 "http_headers": headers,
                 "cookiefile": COOKIE_FILE if os.path.exists(COOKIE_FILE) else None,
                 "ffmpeg_location": FFMPEG_PATH
@@ -580,7 +580,7 @@ def process_download(job_id, original_url, fmt_id, direct_download_url=None):
                     if f.startswith(job_id):
                         job_status[job_id].update({"status": "completed", "file": os.path.join(DOWNLOAD_FOLDER, f), "filename": f})
                         return
-                raise Exception("File missing")
+                raise Exception("File missing after download")
         except Exception as e:
             job_status[job_id].update({"status": "error", "error": str(e)})
 
@@ -613,7 +613,7 @@ def api_download():
     job_id = str(uuid.uuid4())
     job_status[job_id] = {"status": "queued", "percent": "0"}
     
-    # Updated to pass download_url
+    # Pass download_url to background logic
     executor.submit(process_download, job_id, data.get("url"), data.get("format_id"), data.get("download_url"))
     return jsonify({"job_id": job_id})
 
@@ -640,4 +640,3 @@ threading.Thread(target=cleanup_files, daemon=True).start()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, threaded=True)
-
