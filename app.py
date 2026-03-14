@@ -16,6 +16,9 @@ from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
 
+# --- NEW: SUPABASE STORAGE IMPORT ---
+from supabase import create_client, Client
+
 # -------------------------
 # CONFIGURATION
 # -------------------------
@@ -66,9 +69,16 @@ download_semaphore = threading.BoundedSemaphore(MAX_CONCURRENT_DOWNLOADS)
 job_status = {}
 
 # -------------------------
-# DATABASE ENGINE
+# SUPABASE & DATABASE CLIENTS
 # -------------------------
 DATABASE_URL = os.environ.get('DATABASE_URL')
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+
+# Initialize Supabase Storage Client
+supabase: Client = None
+if SUPABASE_URL and SUPABASE_KEY:
+    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def get_db_connection():
     if not DATABASE_URL:
@@ -85,7 +95,6 @@ def init_db():
     
     # 1. CREATE TABLES IF THEY DON'T EXIST
     if db_type == "postgres":
-        # Postgres Syntax
         c.execute("""CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username TEXT UNIQUE, email TEXT, password TEXT, tokens INTEGER DEFAULT 15, last_reset TIMESTAMP, is_admin INTEGER DEFAULT 0, plan TEXT DEFAULT 'Free', referral_code TEXT UNIQUE, referred_by TEXT)""")
         c.execute("""CREATE TABLE IF NOT EXISTS guests (ip TEXT PRIMARY KEY, tokens INTEGER DEFAULT 5, last_reset TIMESTAMP)""")
         c.execute("""CREATE TABLE IF NOT EXISTS payment_requests (id SERIAL PRIMARY KEY, user_id INTEGER, username TEXT, plan_name TEXT, screenshot_path TEXT, status TEXT DEFAULT 'pending', timestamp TIMESTAMP)""")
@@ -94,7 +103,6 @@ def init_db():
         c.execute("""CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, name TEXT, email TEXT, message TEXT, timestamp TIMESTAMP)""")
         conn.commit()
     else:
-        # SQLite Syntax
         c.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, email TEXT, password TEXT, tokens INTEGER DEFAULT 15, last_reset DATETIME, is_admin INTEGER DEFAULT 0, plan TEXT DEFAULT 'Free', referral_code TEXT UNIQUE, referred_by TEXT)")
         c.execute("CREATE TABLE IF NOT EXISTS guests (ip TEXT PRIMARY KEY, tokens INTEGER DEFAULT 5, last_reset DATETIME)")
         c.execute("CREATE TABLE IF NOT EXISTS payment_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, username TEXT, plan_name TEXT, screenshot_path TEXT, status TEXT DEFAULT 'pending', timestamp DATETIME)")
@@ -103,15 +111,13 @@ def init_db():
         c.execute("CREATE TABLE IF NOT EXISTS banned_ips (ip TEXT PRIMARY KEY, reason TEXT, timestamp DATETIME)")
         conn.commit()
 
-    # 2. AUTO-FIX MISSING COLUMNS (DATABASE MIGRATION)
-    # This prevents the "Username Taken" error if your DB is old
+    # 2. AUTO-FIX MISSING COLUMNS
     try:
         if db_type == "postgres":
             c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code TEXT UNIQUE")
             c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by TEXT")
             c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT")
         else:
-            # SQLite check columns first
             c.execute("PRAGMA table_info(users)")
             cols = [info[1] for info in c.fetchall()]
             if "referral_code" not in cols: c.execute("ALTER TABLE users ADD COLUMN referral_code TEXT UNIQUE")
@@ -120,7 +126,7 @@ def init_db():
         conn.commit()
         print("✅ Database Schema Verified/Updated")
     except Exception as e:
-        print(f"⚠️ DB Update Warning (Ignore if working): {e}")
+        print(f"⚠️ DB Update Warning: {e}")
 
     # 3. CREATE ADMIN
     try:
@@ -225,7 +231,6 @@ def register():
     bonus = 0
     
     try:
-        # Check Referral
         if used_ref:
             q = "SELECT id FROM users WHERE referral_code=%s" if t == "postgres" else "SELECT id FROM users WHERE referral_code=?"
             c.execute(q, (used_ref,))
@@ -235,7 +240,6 @@ def register():
                 c.execute(u_q, (referrer['id'] if isinstance(referrer, dict) else referrer[0],))
                 bonus = 10 
 
-        # Insert User
         q = "INSERT INTO users(username, email, password, tokens, last_reset, is_admin, plan, referral_code, referred_by) VALUES (%s, %s, %s, %s, %s, 0, 'Free', %s, %s)" if t == "postgres" else "INSERT INTO users(username, email, password, tokens, last_reset, is_admin, plan, referral_code, referred_by) VALUES (?, ?, ?, ?, ?, 0, 'Free', ?, ?)"
         c.execute(q, (
             data["username"].lower(), 
@@ -249,9 +253,7 @@ def register():
         conn.commit()
         return jsonify({"message": f"Registered! {'You got +10 credits!' if bonus else ''}"}), 201
     except Exception as e:
-        # DEBUG LOGGING FOR ERRORS
         print(f"❌ REGISTRATION ERROR: {e}") 
-        # Return generic error to user but we see logs
         if "UNIQUE constraint" in str(e) or "duplicate key" in str(e):
             return jsonify({"message": "Username taken"}), 409
         return jsonify({"message": "Server Error during registration"}), 500
@@ -291,21 +293,44 @@ def get_status():
     tokens, _ = check_tokens(request.remote_addr, user_id)
     return jsonify({"tokens": tokens, "is_logged_in": user_id is not None, "is_admin": is_admin, "username": username, "plan": plan, "maintenance": maintenance == 'true', "announcement": announcement})
 
+# --- UPDATED: UPLOAD TO SUPABASE INSTEAD OF LOCAL DISK ---
 @app.route("/api/payment/request", methods=["POST"])
 def pay_req():
     user_id = get_user_from_token(request)
     if not user_id: return jsonify({"error": "Login required"}), 401
+    
     file = request.files.get("screenshot")
     if file:
         filename = secure_filename(f"{user_id}_{int(time.time())}_{file.filename}")
-        file.save(os.path.join(UPLOAD_FOLDER, filename))
+        screenshot_url = ""
+        
+        # Upload directly to Supabase Storage if configured
+        if supabase:
+            try:
+                file_bytes = file.read()
+                # Uploads to a bucket named 'screenshots'
+                supabase.storage.from_('screenshots').upload(filename, file_bytes, {"content-type": file.content_type})
+                # Get the public URL to store in the database
+                screenshot_url = supabase.storage.from_('screenshots').get_public_url(filename)
+            except Exception as e:
+                print(f"Supabase Upload Error: {e}")
+                return jsonify({"error": "Failed to save screenshot securely. Contact admin."}), 500
+        else:
+            # Fallback to local storage (WARNING: Will be deleted on Render restart)
+            file.save(os.path.join(UPLOAD_FOLDER, filename))
+            screenshot_url = f"/uploads/{filename}"
+
         conn, t = get_db_connection(); c = conn.cursor()
         uq = "SELECT username FROM users WHERE id=%s" if t == "postgres" else "SELECT username FROM users WHERE id=?"
         c.execute(uq, (user_id,)); u = c.fetchone()['username']
+        
         iq = "INSERT INTO payment_requests (user_id, username, plan_name, screenshot_path, status, timestamp) VALUES (%s, %s, %s, %s, 'pending', %s)" if t == "postgres" else "INSERT INTO payment_requests (user_id, username, plan_name, screenshot_path, status, timestamp) VALUES (?, ?, ?, ?, 'pending', ?)"
-        c.execute(iq, (user_id, u, request.form.get("plan_name"), filename, datetime.now())); conn.commit(); conn.close()
-        return jsonify({"message": "Submitted"})
-    return jsonify({"error": "No file"}), 400
+        c.execute(iq, (user_id, u, request.form.get("plan_name"), screenshot_url, datetime.now()))
+        conn.commit(); conn.close()
+        
+        return jsonify({"message": "Submitted successfully"})
+        
+    return jsonify({"error": "No file uploaded"}), 400
 
 @app.route("/uploads/<filename>")
 def serve_up(filename):
@@ -439,7 +464,7 @@ def admin_reset_pass():
     return jsonify({"message": "Reset"})
 
 # -------------------------
-# DOWNLOADER LOGIC (DESKTOP MODE + COOKIES)
+# DOWNLOADER LOGIC
 # -------------------------
 def format_bytes(size):
     if not size: return "N/A"
@@ -454,7 +479,6 @@ def safe_float(val):
     except: return 0.0
 
 def get_video_formats(url):
-    # USE COOKIES + DESKTOP USER AGENT
     ydl_opts = { 
         "quiet": True, 
         "no_warnings": True, 
