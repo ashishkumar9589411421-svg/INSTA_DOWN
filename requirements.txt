@@ -1,12 +1,8 @@
 Flask==3.0.0
-flask-cors==4.0.0
-
-gunicorn==21.2.0
+Flask-Cors==4.0.0
 PyJWT==2.8.0
-Werkzeug==3.0.1
-psycopg2-binary==2.9.9
-requests
-supabase
-
-
 yt-dlp==2026.3.13
+psycopg2-binary==2.9.9
+gunicorn==21.2.0
+supabase==2.3.4
+pydantic>=2.5.0
