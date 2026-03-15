@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>In.dl - Instagram & Reels Downloader</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <style>
         :root { --bg-deep: #000000; --primary: #d62976; --glass: rgba(20, 20, 20, 0.9); --border: rgba(255, 255, 255, 0.15); --text-main: #ffffff; --text-dim: #888; --font: 'Segoe UI', Roboto, sans-serif; --gold: #ffd700; --success: #00ff88; }
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: var(--font); }
@@ -183,8 +184,14 @@
             <div id="stepScan">
                 <h3 style="margin-bottom:15px; color:white">Complete Payment</h3>
                 <p style="color:#888; margin-bottom:20px; font-size:0.9rem">Please complete your payment securely below.</p>
-                <a href="https://razorpay.me/@byashish" target="_blank" class="liquid-btn" style="width:100%; justify-content:center; background:#3399cc; margin-bottom: 20px;"><i class="fas fa-credit-card" style="margin-right:10px;"></i> Pay via Razorpay</a>
-                <button class="liquid-btn" style="width:100%; justify-content:center; background:#222; border:1px solid #333" onclick="showUploadStep()"><i class="fas fa-check-circle" style="margin-right:10px; color:var(--success)"></i> I have made the payment</button>
+                
+                <button onclick="startRazorpayCheckout(event)" class="liquid-btn" style="width:100%; justify-content:center; background:#3399cc; margin-bottom: 20px;">
+                    <i class="fas fa-bolt" style="margin-right:10px;"></i> Pay Now Instantly
+                </button>
+                
+                <button class="liquid-btn" style="width:100%; justify-content:center; background:#222; border:1px solid #333" onclick="showUploadStep()">
+                    <i class="fas fa-file-upload" style="margin-right:10px; color:#888"></i> I have a manual receipt
+                </button>
             </div>
             <div id="stepUpload">
                 <h3 style="margin-bottom:15px; color:white">Verify Payment</h3>
@@ -429,6 +436,69 @@
                 if(res.ok) { closeModal('paymentModal'); showScanStep(); alert("Submitted! Please wait for admin approval."); } 
                 else alert("Upload Failed"); 
             } catch(e) { alert("Error connecting to server"); } 
+        }
+
+        async function startRazorpayCheckout(event) {
+            const plan = document.getElementById('selectedPlanName').value;
+            const btn = event.currentTarget;
+            const ogText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+            btn.disabled = true;
+
+            try {
+                // Step 1: Create Order from Server
+                const res = await fetch(`${API_URL}/payment/create-order`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+                    body: JSON.stringify({ plan_name: plan })
+                });
+                const order = await res.json();
+
+                if (order.error) {
+                    alert(order.error);
+                    btn.innerHTML = ogText; btn.disabled = false;
+                    return;
+                }
+
+                // Step 2: Open Razorpay Popup
+                var options = {
+                    "key": "rzp_test_SR0otvXz1f0cJS", 
+                    "amount": order.amount, 
+                    "currency": order.currency,
+                    "name": "In.dl Premium",
+                    "description": `Upgrade to ${plan}`,
+                    "order_id": order.id,
+                    "handler": async function (response) {
+                        // Step 3: Verify Payment & Auto Upgrade
+                        const verifyRes = await fetch(`${API_URL}/payment/verify`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+                            body: JSON.stringify({
+                                razorpay_order_id: response.razorpay_order_id,
+                                razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_signature: response.razorpay_signature,
+                                plan_name: plan
+                            })
+                        });
+                        const result = await verifyRes.json();
+                        
+                        if(result.message) {
+                            alert("Boom! Payment Successful. Plan Upgraded.");
+                            closeModal('paymentModal');
+                            checkStatus(); // Instantly refresh tokens on screen
+                        } else {
+                            alert("Verification Failed: " + result.error);
+                        }
+                    },
+                    "theme": { "color": "#d62976" }
+                };
+                var rzp1 = new Razorpay(options);
+                rzp1.open();
+            } catch(e) {
+                alert("Payment process failed.");
+            }
+            btn.innerHTML = ogText; 
+            btn.disabled = false;
         }
 
         async function checkStatus() { 
