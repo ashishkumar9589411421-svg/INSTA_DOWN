@@ -15,8 +15,6 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
-
-# --- NEW: SUPABASE STORAGE IMPORT ---
 from supabase import create_client, Client
 
 # -------------------------
@@ -26,19 +24,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__, static_folder=BASE_DIR, static_url_path='')
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
-# Secrets & Cookies
 SECRET_FILE = os.path.join(BASE_DIR, "secret.key")
 COOKIE_FILE = os.path.join(BASE_DIR, "cookies.txt")
-
-# --- DEBUG: VERIFY COOKIES ---
-print("------------------------------------------------")
-if os.path.exists(COOKIE_FILE):
-    print(f"✅ COOKIES DETECTED: {os.path.getsize(COOKIE_FILE)} bytes")
-    print("   (Using Desktop Mode to match cookies)")
-else:
-    print(f"⚠️ NO COOKIES FOUND")
-    print("   (Upload cookies.txt to fix rate limits)")
-print("------------------------------------------------")
 
 def get_secret_key():
     if os.environ.get('SECRET_KEY'): return os.environ.get('SECRET_KEY')
@@ -50,32 +37,25 @@ def get_secret_key():
 
 app.config['SECRET_KEY'] = get_secret_key()
 
-# Folders
 DOWNLOAD_FOLDER = os.path.join(BASE_DIR, "downloads")
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
 for folder in [DOWNLOAD_FOLDER, UPLOAD_FOLDER]:
     os.makedirs(folder, exist_ok=True)
 
 # FFmpeg Check
-if os.path.exists(os.path.join(BASE_DIR, "ffmpeg.exe")): FFMPEG_PATH = os.path.join(BASE_DIR, "ffmpeg.exe") 
-elif os.path.exists(os.path.join(BASE_DIR, "ffmpeg")): FFMPEG_PATH = os.path.join(BASE_DIR, "ffmpeg") 
+if os.path.exists(os.path.join(BASE_DIR, "ffmpeg")): FFMPEG_PATH = os.path.join(BASE_DIR, "ffmpeg") 
 elif shutil.which("ffmpeg"): FFMPEG_PATH = shutil.which("ffmpeg") 
 else: FFMPEG_PATH = None 
 
-# Threading
 MAX_CONCURRENT_DOWNLOADS = int(os.environ.get('MAX_WORKERS', 2))
 executor = ThreadPoolExecutor(max_workers=MAX_CONCURRENT_DOWNLOADS) 
 download_semaphore = threading.BoundedSemaphore(MAX_CONCURRENT_DOWNLOADS)
 job_status = {}
 
-# -------------------------
-# SUPABASE & DATABASE CLIENTS
-# -------------------------
 DATABASE_URL = os.environ.get('DATABASE_URL')
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
-# Initialize Supabase Storage Client
 supabase: Client = None
 if SUPABASE_URL and SUPABASE_KEY:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -93,7 +73,6 @@ def init_db():
     conn, db_type = get_db_connection()
     c = conn.cursor()
     
-    # 1. CREATE TABLES IF THEY DON'T EXIST
     if db_type == "postgres":
         c.execute("""CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username TEXT UNIQUE, email TEXT, password TEXT, tokens INTEGER DEFAULT 15, last_reset TIMESTAMP, is_admin INTEGER DEFAULT 0, plan TEXT DEFAULT 'Free', referral_code TEXT UNIQUE, referred_by TEXT)""")
         c.execute("""CREATE TABLE IF NOT EXISTS guests (ip TEXT PRIMARY KEY, tokens INTEGER DEFAULT 5, last_reset TIMESTAMP)""")
@@ -111,7 +90,6 @@ def init_db():
         c.execute("CREATE TABLE IF NOT EXISTS banned_ips (ip TEXT PRIMARY KEY, reason TEXT, timestamp DATETIME)")
         conn.commit()
 
-    # 2. AUTO-FIX MISSING COLUMNS
     try:
         if db_type == "postgres":
             c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code TEXT UNIQUE")
@@ -124,11 +102,8 @@ def init_db():
             if "referred_by" not in cols: c.execute("ALTER TABLE users ADD COLUMN referred_by TEXT")
             if "email" not in cols: c.execute("ALTER TABLE users ADD COLUMN email TEXT")
         conn.commit()
-        print("✅ Database Schema Verified/Updated")
-    except Exception as e:
-        print(f"⚠️ DB Update Warning: {e}")
+    except: pass
 
-    # 3. CREATE ADMIN
     try:
         user_ph = "%s" if db_type == "postgres" else "?"
         c.execute(f"SELECT * FROM users WHERE username={user_ph}", ('ashishadmin',))
@@ -136,11 +111,8 @@ def init_db():
             hashed = generate_password_hash("anu9936")
             insert_sql = f"INSERT INTO users (username, password, tokens, last_reset, is_admin, plan) VALUES ({user_ph}, {user_ph}, 999999, {user_ph}, 1, 'God Mode')"
             c.execute(insert_sql, ('ashishadmin', hashed, datetime.now()))
-            print("👑 Admin 'ashishadmin' created")
             conn.commit()
-    except Exception as e:
-        print(f"Admin Init Error: {e}")
-
+    except: pass
     conn.close()
 
 init_db()
@@ -225,11 +197,9 @@ def register():
     data = request.json
     conn, t = get_db_connection()
     c = conn.cursor()
-    
     ref_code = (data["username"][:4] + secrets.token_hex(2)).upper()
     used_ref = data.get("referral_code", "").strip().upper()
     bonus = 0
-    
     try:
         if used_ref:
             q = "SELECT id FROM users WHERE referral_code=%s" if t == "postgres" else "SELECT id FROM users WHERE referral_code=?"
@@ -239,7 +209,6 @@ def register():
                 u_q = "UPDATE users SET tokens = tokens + 10 WHERE id=%s" if t == "postgres" else "UPDATE users SET tokens = tokens + 10 WHERE id=?"
                 c.execute(u_q, (referrer['id'] if isinstance(referrer, dict) else referrer[0],))
                 bonus = 10 
-
         q = "INSERT INTO users(username, email, password, tokens, last_reset, is_admin, plan, referral_code, referred_by) VALUES (%s, %s, %s, %s, %s, 0, 'Free', %s, %s)" if t == "postgres" else "INSERT INTO users(username, email, password, tokens, last_reset, is_admin, plan, referral_code, referred_by) VALUES (?, ?, ?, ?, ?, 0, 'Free', ?, ?)"
         c.execute(q, (
             data["username"].lower(), 
@@ -253,7 +222,6 @@ def register():
         conn.commit()
         return jsonify({"message": f"Registered! {'You got +10 credits!' if bonus else ''}"}), 201
     except Exception as e:
-        print(f"❌ REGISTRATION ERROR: {e}") 
         if "UNIQUE constraint" in str(e) or "duplicate key" in str(e):
             return jsonify({"message": "Username taken"}), 409
         return jsonify({"message": "Server Error during registration"}), 500
@@ -293,7 +261,6 @@ def get_status():
     tokens, _ = check_tokens(request.remote_addr, user_id)
     return jsonify({"tokens": tokens, "is_logged_in": user_id is not None, "is_admin": is_admin, "username": username, "plan": plan, "maintenance": maintenance == 'true', "announcement": announcement})
 
-# --- UPDATED: UPLOAD TO SUPABASE INSTEAD OF LOCAL DISK ---
 @app.route("/api/payment/request", methods=["POST"])
 def pay_req():
     user_id = get_user_from_token(request)
@@ -304,19 +271,14 @@ def pay_req():
         filename = secure_filename(f"{user_id}_{int(time.time())}_{file.filename}")
         screenshot_url = ""
         
-        # Upload directly to Supabase Storage if configured
         if supabase:
             try:
                 file_bytes = file.read()
-                # Uploads to a bucket named 'screenshots'
                 supabase.storage.from_('screenshots').upload(filename, file_bytes, {"content-type": file.content_type})
-                # Get the public URL to store in the database
                 screenshot_url = supabase.storage.from_('screenshots').get_public_url(filename)
-            except Exception as e:
-                print(f"Supabase Upload Error: {e}")
+            except Exception:
                 return jsonify({"error": "Failed to save screenshot securely. Contact admin."}), 500
         else:
-            # Fallback to local storage (WARNING: Will be deleted on Render restart)
             file.save(os.path.join(UPLOAD_FOLDER, filename))
             screenshot_url = f"/uploads/{filename}"
 
@@ -327,9 +289,7 @@ def pay_req():
         iq = "INSERT INTO payment_requests (user_id, username, plan_name, screenshot_path, status, timestamp) VALUES (%s, %s, %s, %s, 'pending', %s)" if t == "postgres" else "INSERT INTO payment_requests (user_id, username, plan_name, screenshot_path, status, timestamp) VALUES (?, ?, ?, ?, 'pending', ?)"
         c.execute(iq, (user_id, u, request.form.get("plan_name"), screenshot_url, datetime.now()))
         conn.commit(); conn.close()
-        
         return jsonify({"message": "Submitted successfully"})
-        
     return jsonify({"error": "No file uploaded"}), 400
 
 @app.route("/uploads/<filename>")
@@ -490,7 +450,6 @@ def get_video_formats(url):
         "cookiefile": COOKIE_FILE if os.path.exists(COOKIE_FILE) else None,
         "ffmpeg_location": FFMPEG_PATH
     }
-
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -516,10 +475,8 @@ def get_video_formats(url):
                         if tbr > 0: f_size = (tbr * 1000 * duration) / 8
                     formats_list.append({"id": f"video-{h}", "type": "video", "quality": f"{h}p", "ext": "mp4", "size": format_bytes(f_size), "height": h})
                 formats_list.sort(key=lambda x: x.get('height', 0), reverse=True)
-
             return { "title": info.get("title", "Video"), "thumbnail": info.get("thumbnail", ""), "duration": info.get("duration_string", "N/A"), "formats": formats_list }
-    except Exception as e: 
-        print(f"Info Error: {e}")
+    except Exception: 
         return None
 
 def process_download(job_id, url, fmt_id):
@@ -616,6 +573,7 @@ def cleanup_files():
                     if os.path.isfile(f_path) and now - os.path.getmtime(f_path) > 3600: os.remove(f_path)
             except: pass
         time.sleep(600)
+
 threading.Thread(target=cleanup_files, daemon=True).start()
 
 if __name__ == "__main__":
