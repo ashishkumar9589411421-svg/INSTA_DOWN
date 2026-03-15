@@ -6,3 +6,4 @@ psycopg2-binary==2.9.9
 gunicorn==21.2.0
 supabase==2.3.4
 pydantic>=2.5.0
+razorpay==1.4.1
