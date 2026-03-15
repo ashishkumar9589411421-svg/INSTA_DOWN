@@ -85,11 +85,6 @@
         .plan-btn.gold-btn:hover { background: white; }
         .plan-btn.current { background: #222; cursor: default; color: #666; }
         
-        .qr-img { width: 100%; max-width: 250px; border-radius: 15px; margin-bottom: 20px; border: 2px solid white; display:block; margin-left:auto; margin-right:auto; }
-        .upi-box { background: #222; padding: 10px 15px; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; border: 1px solid #333; flex-wrap: wrap; gap: 10px; }
-        .upi-text { font-family: monospace; font-size: 1.1rem; color: var(--gold); word-break: break-all; }
-        .copy-btn { color: #888; cursor: pointer; transition: 0.2s; }
-        .copy-btn:hover { color: white; }
         #stepUpload { display: none; animation: slideUp 0.4s ease; }
         #stepScan { animation: popUp 0.4s ease; }
         
@@ -186,9 +181,9 @@
         <div class="modal-box">
             <i class="fas fa-times" onclick="closeModal('paymentModal')" style="position:absolute; top:20px; right:20px; cursor:pointer; font-size:1.5rem; color:#555"></i>
             <div id="stepScan">
-                <h3 style="margin-bottom:15px; color:white">Scan to Pay</h3>
-                <img src="qr.jpeg" class="qr-img" alt="Scan QR">
-                <div class="upi-box"><span class="upi-text" id="upiId">9369228920@fam</span><i class="fas fa-copy copy-btn" onclick="copyUPI()"></i></div>
+                <h3 style="margin-bottom:15px; color:white">Complete Payment</h3>
+                <p style="color:#888; margin-bottom:20px; font-size:0.9rem">Please complete your payment securely below.</p>
+                <a href="https://razorpay.me/@byashish" target="_blank" class="liquid-btn" style="width:100%; justify-content:center; background:#3399cc; margin-bottom: 20px;"><i class="fas fa-credit-card" style="margin-right:10px;"></i> Pay via Razorpay</a>
                 <button class="liquid-btn" style="width:100%; justify-content:center; background:#222; border:1px solid #333" onclick="showUploadStep()"><i class="fas fa-check-circle" style="margin-right:10px; color:var(--success)"></i> I have made the payment</button>
             </div>
             <div id="stepUpload">
@@ -199,7 +194,7 @@
                     <input type="file" id="proofFile" class="modal-inp" accept="image/*" required>
                     <button type="submit" class="liquid-btn" style="width:100%; justify-content:center">SUBMIT PROOF</button>
                 </form>
-                <p style="margin-top:15px; color:#555; cursor:pointer; font-size:0.8rem" onclick="showScanStep()">Go back to QR</p>
+                <p style="margin-top:15px; color:#555; cursor:pointer; font-size:0.8rem" onclick="showScanStep()">Go back to Payment</p>
             </div>
         </div>
     </div>
@@ -421,7 +416,6 @@
 
         function showUploadStep() { document.getElementById('stepScan').style.display = 'none'; document.getElementById('stepUpload').style.display = 'block'; }
         function showScanStep() { document.getElementById('stepScan').style.display = 'block'; document.getElementById('stepUpload').style.display = 'none'; }
-        function copyUPI() { const txt = document.getElementById('upiId').innerText; navigator.clipboard.writeText(txt); alert("UPI ID Copied: " + txt); }
 
         async function submitPayment(e) { 
             e.preventDefault(); 
@@ -442,15 +436,6 @@
                 const res = await fetch(`${API_URL}/status`, { headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {} }); 
                 const d = await res.json(); 
 
-                // NEW FEATURE: MAINTENANCE CHECK (COMMENTED OUT TO PREVENT LOCKOUT)
-                /*
-                if(d.maintenance && !d.is_admin) {
-                    document.getElementById('maintOverlay').style.display = 'flex';
-                    return; // Stop execution to block access
-                }
-                */
-
-                // NEW FEATURE: ANNOUNCEMENT BAR
                 if(d.announcement) {
                     const bar = document.getElementById('announcementBar');
                     bar.innerText = d.announcement;
@@ -499,7 +484,6 @@
                 const res = await fetch(`${API_URL}/download`, { method: 'POST', headers, body: JSON.stringify({ url, format_id: fmtId }) }); 
                 const data = await res.json(); 
                 
-                // NEW FEATURE: Handle Banned/Maintenance Errors
                 if(res.status === 403 && data.error === "BANNED") {
                     alert(data.message);
                     btn.innerHTML = orgHtml; btn.disabled = false;
@@ -584,5 +568,4 @@
         };
     </script>
 </body>
-
 </html>
