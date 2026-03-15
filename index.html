@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>In.dl - Instagram & Reels Downloader</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <style>
         :root { --bg-deep: #000000; --primary: #d62976; --glass: rgba(20, 20, 20, 0.9); --border: rgba(255, 255, 255, 0.15); --text-main: #ffffff; --text-dim: #888; --font: 'Segoe UI', Roboto, sans-serif; --gold: #ffd700; --success: #00ff88; }
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: var(--font); }
@@ -185,12 +184,10 @@
                 <h3 style="margin-bottom:15px; color:white">Complete Payment</h3>
                 <p style="color:#888; margin-bottom:20px; font-size:0.9rem">Please complete your payment securely below.</p>
                 
-                <button onclick="startRazorpayCheckout(event)" class="liquid-btn" style="width:100%; justify-content:center; background:#3399cc; margin-bottom: 20px;">
-                    <i class="fas fa-bolt" style="margin-right:10px;"></i> Pay Now Instantly
-                </button>
+                <a href="https://razorpay.me/@byashish" target="_blank" class="liquid-btn" style="width:100%; justify-content:center; background:#3399cc; margin-bottom: 20px;"><i class="fas fa-credit-card" style="margin-right:10px;"></i> Pay via Razorpay</a>
                 
                 <button class="liquid-btn" style="width:100%; justify-content:center; background:#222; border:1px solid #333" onclick="showUploadStep()">
-                    <i class="fas fa-file-upload" style="margin-right:10px; color:#888"></i> I have a manual receipt
+                    <i class="fas fa-check-circle" style="margin-right:10px; color:var(--success)"></i> I have made the payment
                 </button>
             </div>
             <div id="stepUpload">
@@ -438,6 +435,7 @@
             } catch(e) { alert("Error connecting to server"); } 
         }
 
+        /* RAZORPAY API FUNCTION COMMENTED OUT
         async function startRazorpayCheckout(event) {
             const plan = document.getElementById('selectedPlanName').value;
             const btn = event.currentTarget;
@@ -500,6 +498,7 @@
             btn.innerHTML = ogText; 
             btn.disabled = false;
         }
+        */
 
         async function checkStatus() { 
             try { 
