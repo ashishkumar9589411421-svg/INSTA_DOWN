@@ -16,7 +16,7 @@ from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
 from supabase import create_client, Client
-import razorpay
+# import razorpay
 
 # -------------------------
 # CONFIGURATION
@@ -61,8 +61,8 @@ supabase: Client = None
 if SUPABASE_URL and SUPABASE_KEY:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Razorpay Setup (Test Keys)
-razorpay_client = razorpay.Client(auth=("rzp_test_SR0otvXz1f0cJS", "EuBebpg2glCHSaVhnmI0BoJz"))
+# Razorpay Setup (COMMENTED OUT)
+# razorpay_client = razorpay.Client(auth=("rzp_test_SR0otvXz1f0cJS", "EuBebpg2glCHSaVhnmI0BoJz"))
 
 def get_db_connection():
     if not DATABASE_URL:
@@ -265,46 +265,44 @@ def get_status():
     tokens, _ = check_tokens(request.remote_addr, user_id)
     return jsonify({"tokens": tokens, "is_logged_in": user_id is not None, "is_admin": is_admin, "username": username, "plan": plan, "maintenance": maintenance == 'true', "announcement": announcement})
 
-# --- RAZORPAY PAYMENT APIS ---
-@app.route("/api/payment/create-order", methods=["POST"])
-def create_order():
-    user_id = get_user_from_token(request)
-    if not user_id: return jsonify({"error": "Login required"}), 401
-    
-    data = request.json
-    plan_name = data.get("plan_name")
-    amount = 7000 if "God" in plan_name else 2500 # Razorpay takes amount in paise (70 rs = 7000)
-    
-    order_data = {"amount": amount, "currency": "INR", "receipt": f"receipt_{user_id}_{int(time.time())}"}
-    order = razorpay_client.order.create(data=order_data)
-    return jsonify(order)
-
-@app.route("/api/payment/verify", methods=["POST"])
-def verify_payment():
-    user_id = get_user_from_token(request)
-    if not user_id: return jsonify({"error": "Login required"}), 401
-    
-    data = request.json
-    try:
-        # Verify if the payment is legit
-        razorpay_client.utility.verify_payment_signature({
-            'razorpay_order_id': data.get('razorpay_order_id'),
-            'razorpay_payment_id': data.get('razorpay_payment_id'),
-            'razorpay_signature': data.get('razorpay_signature')
-        })
-        
-        # Upgrade User Instantly
-        plan_name = data.get("plan_name")
-        tokens = 999999 if "God" in plan_name else 50
-        
-        conn, t = get_db_connection(); c = conn.cursor()
-        uq = "UPDATE users SET tokens = tokens + %s, plan = %s WHERE id=%s" if t == "postgres" else "UPDATE users SET tokens = tokens + ?, plan = ? WHERE id=?"
-        c.execute(uq, (tokens, plan_name, user_id))
-        conn.commit(); conn.close()
-        
-        return jsonify({"message": "Payment verified! Account upgraded instantly."})
-    except razorpay.errors.SignatureVerificationError:
-        return jsonify({"error": "Invalid signature"}), 400
+# --- RAZORPAY PAYMENT APIS (COMMENTED OUT) ---
+# @app.route("/api/payment/create-order", methods=["POST"])
+# def create_order():
+#     user_id = get_user_from_token(request)
+#     if not user_id: return jsonify({"error": "Login required"}), 401
+#     
+#     data = request.json
+#     plan_name = data.get("plan_name")
+#     amount = 7000 if "God" in plan_name else 2500
+#     
+#     order_data = {"amount": amount, "currency": "INR", "receipt": f"receipt_{user_id}_{int(time.time())}"}
+#     order = razorpay_client.order.create(data=order_data)
+#     return jsonify(order)
+# 
+# @app.route("/api/payment/verify", methods=["POST"])
+# def verify_payment():
+#     user_id = get_user_from_token(request)
+#     if not user_id: return jsonify({"error": "Login required"}), 401
+#     
+#     data = request.json
+#     try:
+#         razorpay_client.utility.verify_payment_signature({
+#             'razorpay_order_id': data.get('razorpay_order_id'),
+#             'razorpay_payment_id': data.get('razorpay_payment_id'),
+#             'razorpay_signature': data.get('razorpay_signature')
+#         })
+#         
+#         plan_name = data.get("plan_name")
+#         tokens = 999999 if "God" in plan_name else 50
+#         
+#         conn, t = get_db_connection(); c = conn.cursor()
+#         uq = "UPDATE users SET tokens = tokens + %s, plan = %s WHERE id=%s" if t == "postgres" else "UPDATE users SET tokens = tokens + ?, plan = ? WHERE id=?"
+#         c.execute(uq, (tokens, plan_name, user_id))
+#         conn.commit(); conn.close()
+#         
+#         return jsonify({"message": "Payment verified! Account upgraded instantly."})
+#     except razorpay.errors.SignatureVerificationError:
+#         return jsonify({"error": "Invalid signature"}), 400
 
 @app.route("/api/payment/request", methods=["POST"])
 def pay_req():
