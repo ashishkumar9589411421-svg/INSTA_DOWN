@@ -4,29 +4,34 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Contact - In.dl Downloader</title>
+    
+    <link rel="icon" type="image/png" href="logo.png">
+
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         :root { 
             --bg-deep: #000000; 
             --primary: #d62976; 
-            --glass: rgba(20, 20, 20, 0.9); 
+            --glass: rgba(20, 20, 20, 0.7); 
             --text: #ffffff; 
-            --text-dim: #888;
+            --text-dim: #aaa;
             --border: rgba(255, 255, 255, 0.1);
         }
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Roboto, sans-serif; }
         
         body { 
             background-color: var(--bg-deep); 
-            background-image: radial-gradient(circle at 50% 50%, #111 0%, #000 100%);
+            background-image: radial-gradient(circle at 50% 50%, #151515 0%, #000 100%);
             color: var(--text); 
             min-height: 100vh; 
             overflow-x: hidden; 
+            display: flex;
+            flex-direction: column;
         }
 
         /* Particle Background */
         .void-stream { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; overflow: hidden; pointer-events: none; }
-        .stream-icon { position: absolute; color: rgba(255, 255, 255, 0.08); font-size: 2.5rem; animation: floatRise linear infinite; }
+        .stream-icon { position: absolute; color: rgba(255, 255, 255, 0.05); font-size: 2.5rem; animation: floatRise linear infinite; }
         @keyframes floatRise {
             0% { transform: translateY(110vh) scale(0.8) rotate(0deg); opacity: 0; }
             10% { opacity: 1; }
@@ -35,142 +40,93 @@
         }
 
         /* Navbar */
-        header { padding: 20px 0; border-bottom: 1px solid #222; background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 100; }
-        .nav { max-width: 1000px; margin: 0 auto; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; }
-        .logo { font-size: 1.5rem; font-weight: 900; display: flex; align-items: center; gap: 10px; text-decoration: none; color: white; }
+        header { padding: 20px 0; border-bottom: 1px solid #222; background: rgba(0,0,0,0.8); backdrop-filter: blur(15px); position: sticky; top: 0; z-index: 100; }
+        .nav { max-width: 1200px; margin: 0 auto; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 1.5rem; font-weight: 900; display: flex; align-items: center; gap: 10px; text-decoration: none; color: white; transition: 0.3s; }
+        .logo:hover { transform: scale(1.05); text-shadow: 0 0 15px var(--primary); }
         .logo i { color: var(--primary); }
-        .back-btn { padding: 8px 20px; border: 1px solid #333; border-radius: 50px; color: white; text-decoration: none; transition: 0.3s; font-size: 0.9rem; }
-        .back-btn:hover { border-color: var(--primary); background: rgba(214, 41, 118, 0.1); }
+        .back-btn { padding: 8px 20px; border: 1px solid #333; border-radius: 50px; color: white; text-decoration: none; transition: 0.3s; font-size: 0.9rem; display: flex; align-items: center; gap: 8px; }
+        .back-btn:hover { border-color: var(--primary); background: rgba(214, 41, 118, 0.1); box-shadow: 0 0 15px rgba(214, 41, 118, 0.3); }
 
-        /* Main Container */
-        .container { max-width: 900px; margin: 60px auto; padding: 0 20px; display: flex; flex-direction: column; align-items: center; }
+        /* Main Container Grid */
+        .container { 
+            max-width: 1200px; 
+            margin: 60px auto; 
+            padding: 0 20px; 
+            display: grid; 
+            grid-template-columns: 1fr 1.2fr; 
+            gap: 60px;
+            align-items: flex-start;
+            flex: 1;
+        }
+
+        /* Left Side: Info */
+        .info-side { display: flex; flex-direction: column; gap: 40px; }
+        .hero-text h1 { font-size: 3.5rem; margin-bottom: 15px; background: linear-gradient(to right, #fff, #888); -webkit-background-clip: text; -webkit-text-fill-color: transparent; line-height: 1.1; }
+        .hero-text p { color: var(--text-dim); font-size: 1.1rem; line-height: 1.6; }
+
+        /* Quick Info Cards */
+        .quick-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .info-card { background: rgba(255,255,255,0.03); border: 1px solid var(--border); padding: 20px; border-radius: 15px; display: flex; align-items: flex-start; gap: 15px; transition: 0.3s; }
+        .info-card:hover { border-color: var(--primary); background: rgba(255,255,255,0.05); transform: translateY(-5px); }
+        .info-icon { width: 40px; height: 40px; background: rgba(214, 41, 118, 0.1); color: var(--primary); border-radius: 10px; display: flex; justify-content: center; align-items: center; font-size: 1.2rem; flex-shrink: 0; }
+        .info-content h4 { font-size: 0.9rem; color: #fff; margin-bottom: 5px; }
+        .info-content p { font-size: 0.85rem; color: var(--text-dim); }
+
+        /* Social Logos with Names */
+        .social-section h3 { margin-bottom: 20px; font-size: 1.2rem; color: #fff; border-bottom: 1px solid #333; padding-bottom: 10px; display: inline-block;}
+        .social-container { display: flex; gap: 30px; flex-wrap: wrap; }
         
-        .hero-text { text-align: center; margin-bottom: 50px; }
-        .hero-text h1 { font-size: 3rem; margin-bottom: 15px; background: linear-gradient(to right, white, #666); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .hero-text p { color: var(--text-dim); font-size: 1.1rem; max-width: 600px; margin: 0 auto; }
+        .social-wrapper { display: flex; flex-direction: column; align-items: center; gap: 12px; cursor: pointer; }
+        .social-name { font-size: 0.9rem; color: #888; font-weight: 600; transition: 0.4s; letter-spacing: 1px; }
+        
+        .glow-icon { position: relative; width: 65px; height: 65px; background: rgba(255, 255, 255, 0.05); border-radius: 50%; display: flex; justify-content: center; align-items: center; text-decoration: none; transition: 0.4s; border: 1px solid rgba(255, 255, 255, 0.1); overflow: hidden; }
+        .glow-icon i { font-size: 26px; color: #fff; transition: 0.4s; z-index: 2; }
 
-        /* --- THE GLOWING ICONS (From Video) --- */
-        .social-container {
-            display: flex;
-            justify-content: center;
-            gap: 40px;
-            margin-bottom: 60px;
-            flex-wrap: wrap;
-        }
-
-        .glow-icon {
-            position: relative;
-            width: 70px;
-            height: 70px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            text-decoration: none;
-            transition: 0.4s;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            overflow: hidden;
-        }
-
-        .glow-icon i {
-            font-size: 28px;
-            color: #fff;
-            transition: 0.4s;
-            z-index: 2;
-        }
-
-        /* Hover Effects */
-        .glow-icon:hover {
-            background: var(--color); /* Uses the CSS variable defined inline */
-            box-shadow: 0 0 40px var(--color), 0 0 80px var(--color);
-            transform: translateY(-10px);
-            border-color: var(--color);
-        }
-
-        .glow-icon:hover i {
-            color: #fff;
-            transform: scale(1.2);
-        }
+        .social-wrapper:hover .glow-icon { background: var(--color); box-shadow: 0 0 30px var(--color); transform: translateY(-10px); border-color: var(--color); }
+        .social-wrapper:hover .glow-icon i { transform: scale(1.2); }
+        .social-wrapper:hover .social-name { color: #fff; text-shadow: 0 0 10px var(--color); transform: translateY(-5px); }
 
         /* Specific Colors */
-        .glow-icon.insta { --color: #d62976; }
-        .glow-icon.git { --color: #6e5494; } /* GitHub Purple */
-        .glow-icon.port { --color: #ffd700; } /* Gold */
+        .social-wrapper.insta { --color: #d62976; }
+        .social-wrapper.git { --color: #6e5494; } 
+        .social-wrapper.port { --color: #ffd700; } 
 
-        /* --- Contact Form --- */
-        .form-card {
-            background: var(--glass);
-            padding: 40px;
-            border-radius: 20px;
-            border: 1px solid var(--border);
-            width: 100%;
-            max-width: 700px;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-        }
+        /* Right Side: Form Card */
+        .form-card { background: var(--glass); padding: 40px; border-radius: 20px; border: 1px solid var(--border); width: 100%; backdrop-filter: blur(15px); box-shadow: 0 20px 50px rgba(0,0,0,0.5); position: relative; overflow: hidden; }
+        
+        /* Decorative glow behind form */
+        .form-card::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(214,41,118,0.05) 0%, transparent 50%); z-index: -1; pointer-events: none; }
 
+        .form-title { margin-bottom: 30px; font-size: 1.8rem; display: flex; align-items: center; gap: 15px; }
+        
+        /* Input Group Grid */
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .inp-group { margin-bottom: 20px; position: relative; }
-        .inp-group label { display: block; margin-bottom: 8px; color: #aaa; font-size: 0.9rem; font-weight: 600; }
+        .inp-group.full-width { grid-column: span 2; }
+        .inp-group label { display: block; margin-bottom: 8px; color: #ccc; font-size: 0.9rem; font-weight: 600; letter-spacing: 0.5px; }
         
-        .inp-field {
-            width: 100%;
-            padding: 15px;
-            background: #0a0a0a;
-            border: 1px solid #333;
-            border-radius: 10px;
-            color: white;
-            font-size: 1rem;
-            outline: none;
-            transition: 0.3s;
-        }
-        
-        .inp-field:focus { border-color: var(--primary); box-shadow: 0 0 15px rgba(214, 41, 118, 0.2); }
-        textarea.inp-field { resize: vertical; min-height: 120px; }
+        .inp-field { width: 100%; padding: 16px; background: rgba(0,0,0,0.5); border: 1px solid #333; border-radius: 12px; color: white; font-size: 1rem; outline: none; transition: 0.3s; }
+        .inp-field:focus { border-color: var(--primary); box-shadow: 0 0 20px rgba(214, 41, 118, 0.15); background: rgba(0,0,0,0.8); }
+        textarea.inp-field { resize: vertical; min-height: 140px; }
 
-        .submit-btn {
-            width: 100%;
-            padding: 15px;
-            background: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 50px;
-            font-size: 1.1rem;
-            font-weight: bold;
-            cursor: pointer;
-            transition: 0.3s;
-            box-shadow: 0 0 20px rgba(214, 41, 118, 0.4);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
+        .submit-btn { width: 100%; padding: 18px; background: var(--primary); color: white; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: 0.3s; box-shadow: 0 0 20px rgba(214, 41, 118, 0.3); display: flex; align-items: center; justify-content: center; gap: 10px; letter-spacing: 1px; text-transform: uppercase; }
+        .submit-btn:hover { transform: translateY(-3px); box-shadow: 0 10px 40px rgba(214, 41, 118, 0.5); background: #f03386; }
 
-        .submit-btn:hover {
-            transform: scale(1.02);
-            box-shadow: 0 0 40px rgba(214, 41, 118, 0.6);
-        }
-
-        /* Success Message Animation */
-        #msgSent {
-            display: none;
-            margin-top: 20px;
-            padding: 15px;
-            background: rgba(0, 255, 136, 0.1);
-            border: 1px solid #00ff88;
-            color: #00ff88;
-            border-radius: 10px;
-            text-align: center;
-            animation: popIn 0.4s ease;
-        }
+        #msgSent { display: none; margin-top: 20px; padding: 15px; background: rgba(0, 255, 136, 0.1); border: 1px solid #00ff88; color: #00ff88; border-radius: 10px; text-align: center; animation: popIn 0.4s ease; font-weight: bold; }
         @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
-        footer { margin-top: 80px; padding: 40px; border-top: 1px solid #222; text-align: center; color: #444; }
+        footer { margin-top: auto; padding: 30px; border-top: 1px solid #222; text-align: center; color: #555; background: #050505; }
 
-        @media (max-width: 600px) {
-            .hero-text h1 { font-size: 2.2rem; }
-            .social-container { gap: 20px; }
-            .glow-icon { width: 60px; height: 60px; }
+        @media (max-width: 900px) {
+            .container { grid-template-columns: 1fr; gap: 40px; }
+            .hero-text h1 { font-size: 2.5rem; }
+            .form-grid { grid-template-columns: 1fr; }
+            .inp-group.full-width { grid-column: span 1; }
+        }
+        @media (max-width: 500px) {
+            .quick-info-grid { grid-template-columns: 1fr; }
+            .social-container { justify-content: center; }
             .form-card { padding: 25px; }
         }
     </style>
@@ -186,42 +142,73 @@
     </header>
 
     <div class="container">
-        <div class="hero-text">
-            <h1>Get in Touch</h1>
-            <p>Have a question, a bug report, or just want to say hi? I'm always open to discussing new projects and creative ideas.</p>
-        </div>
+        <div class="info-side">
+            <div class="hero-text">
+                <h1>Let's build<br>something great.</h1>
+                <p>Have a question, a bug report, or just want to say hi? I'm always open to discussing new projects and creative ideas.</p>
+            </div>
 
-        <div class="social-container">
-            <a href="https://www.instagram.com/a_s__yadav_" class="glow-icon insta" target="_blank">
-                <i class="fab fa-instagram"></i>
-            </a>
-            <a href="https://github.com/ashishkumar9589411421-svg" class="glow-icon git" target="_blank">
-                <i class="fab fa-github"></i>
-            </a>
-            <a href="https://ashishkumar9589411421-svg.github.io/portfolio_v27-11-25/" class="glow-icon port" target="_blank" title="Portfolio">
-                <i class="fas fa-briefcase"></i>
-            </a>
+            <div class="quick-info-grid">
+                <div class="info-card">
+                    <div class="info-icon"><i class="fas fa-envelope"></i></div>
+                    <div class="info-content">
+                        <h4>Email Me</h4>
+                        <p>admin@byashish.online</p>
+                    </div>
+                </div>
+                <div class="info-card">
+                    <div class="info-icon"><i class="fas fa-bolt"></i></div>
+                    <div class="info-content">
+                        <h4>Fast Response</h4>
+                        <p>Usually within 24 hours</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="social-section">
+                <h3>Connect With Me</h3>
+                <div class="social-container">
+                    <div class="social-wrapper insta" onclick="window.open('https://www.instagram.com/a_s__yadav_', '_blank')">
+                        <div class="glow-icon"><i class="fab fa-instagram"></i></div>
+                        <span class="social-name">Instagram</span>
+                    </div>
+                    
+                    <div class="social-wrapper git" onclick="window.open('https://github.com/ashishkumar9589411421-svg', '_blank')">
+                        <div class="glow-icon"><i class="fab fa-github"></i></div>
+                        <span class="social-name">GitHub</span>
+                    </div>
+                    
+                    <div class="social-wrapper port" onclick="window.open('https://ashishkumar9589411421-svg.github.io/portfolio_v27-11-25/', '_blank')">
+                        <div class="glow-icon"><i class="fas fa-briefcase"></i></div>
+                        <span class="social-name">Portfolio</span>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="form-card">
-            <h3 style="margin-bottom: 25px; font-size: 1.5rem; display: flex; align-items: center; gap: 10px;">
-                <i class="fas fa-envelope-open-text" style="color:var(--primary)"></i> Send a Message
-            </h3>
+            <h2 class="form-title"><i class="fas fa-paper-plane" style="color:var(--primary)"></i> Send a Message</h2>
             <form id="contactForm">
-                <div class="inp-group">
-                    <label>Your Name</label>
-                    <input type="text" class="inp-field" placeholder="John Doe" required>
-                </div>
-                <div class="inp-group">
-                    <label>Email Address</label>
-                    <input type="email" class="inp-field" placeholder="john@example.com" required>
-                </div>
-                <div class="inp-group">
-                    <label>Message</label>
-                    <textarea class="inp-field" placeholder="Tell me about your project or issue..." required></textarea>
+                <div class="form-grid">
+                    <div class="inp-group">
+                        <label>First Name</label>
+                        <input type="text" class="inp-field" placeholder="John" required>
+                    </div>
+                    <div class="inp-group">
+                        <label>Last Name</label>
+                        <input type="text" class="inp-field" placeholder="Doe">
+                    </div>
+                    <div class="inp-group full-width">
+                        <label>Email Address</label>
+                        <input type="email" class="inp-field" placeholder="john@example.com" required>
+                    </div>
+                    <div class="inp-group full-width">
+                        <label>Your Message</label>
+                        <textarea class="inp-field" placeholder="Tell me about your project or issue..." required></textarea>
+                    </div>
                 </div>
                 <button type="submit" class="submit-btn">
-                    <span>Send Message</span> <i class="fas fa-paper-plane"></i>
+                    <span>Send Message</span> <i class="fas fa-arrow-right"></i>
                 </button>
             </form>
             <div id="msgSent">
@@ -257,9 +244,12 @@
             
             const btn = document.querySelector('.submit-btn');
             const originalText = btn.innerHTML;
-            const name = document.querySelector('input[type="text"]').value;
-            const email = document.querySelector('input[type="email"]').value;
-            const msgText = document.querySelector('textarea').value;
+            
+            // Getting values from the grid inputs
+            const inputs = document.querySelectorAll('.inp-field');
+            const name = inputs[0].value + " " + inputs[1].value;
+            const email = inputs[2].value;
+            const msgText = inputs[3].value;
 
             btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Sending...';
             btn.disabled = true;
@@ -269,7 +259,7 @@
                 const res = await fetch('/api/contact', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: name, email: email, message: msgText })
+                    body: JSON.stringify({ name: name.trim(), email: email, message: msgText })
                 });
 
                 if(res.ok) {
