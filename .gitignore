@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Environment
+.env
+.env.local
+.env.production
+secret.key
+
+# Database
+*.db
+*.sqlite3
+
+# Downloads & Uploads (ephemeral)
+downloads/
+uploads/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Cookies (sensitive)
+cookies.txt
+
+# Large assets (track separately if needed)
+# my.png
+
+# Node (if any tooling)
+node_modules/
