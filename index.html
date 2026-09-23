@@ -44,8 +44,8 @@
     </div>
 
     <!-- Auth Modal -->
-    <div class="modal" id="authModal">
-        <div class="modal__content">
+    <div class="modal-overlay" id="authModal">
+        <div class="modal">
             <button class="modal__close" onclick="InUI.closeModal('authModal')"><i class="fas fa-times"></i></button>
             <h2 id="authTitle" class="modal__title">Welcome Back</h2>
             <p id="authSub" class="text-muted text-center mb-lg">Sign in to your account</p>
@@ -81,8 +81,8 @@
     </div>
 
     <!-- Payment Modal -->
-    <div class="modal" id="paymentModal">
-        <div class="modal__content">
+    <div class="modal-overlay" id="paymentModal">
+        <div class="modal">
             <button class="modal__close" onclick="InUI.closeModal('paymentModal')"><i class="fas fa-times"></i></button>
             
             <div id="stepScan">
@@ -114,8 +114,8 @@
     </div>
 
     <!-- Plan Modal -->
-    <div class="modal" id="planModal">
-        <div class="modal__content" style="max-width: 900px; background: transparent; border: none; box-shadow: none;">
+    <div class="modal-overlay" id="planModal">
+        <div class="modal modal--wide modal--transparent">
             <button class="modal__close" onclick="InUI.closeModal('planModal')" style="color:white; top:-20px; right:0;"><i class="fas fa-times fa-2x"></i></button>
             <h2 class="text-center mb-xl" style="font-size:2.5rem; color:white">Choose Your Power</h2>
             
