@@ -1,7 +1,0 @@
-User-agent: *
-Allow: /
-Disallow: /admin.html
-Disallow: /api/
-Disallow: /uploads/
-
-Sitemap: https://in.dl/sitemap.xml
